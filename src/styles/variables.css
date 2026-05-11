@@ -1,0 +1,62 @@
+:root {
+  /* Brand */
+  --color-primary: #0066cc;
+  --color-primary-focus: #0071e3;
+  --color-primary-on-dark: #2997ff;
+
+  /* Surfaces */
+  --color-canvas: #ffffff;
+  --color-parchment: #f5f5f7;
+  --color-surface-black: #000000;
+  --color-surface-tile-1: #272729;
+  --color-surface-tile-2: #2a2a2c;
+
+  /* Text */
+  --color-ink: #1d1d1f;
+  --color-muted: #7a7a7a;
+  --color-body-on-dark: #ffffff;
+
+  /* Node type colors */
+  --color-node-person: #0a84ff;
+  --color-node-company: #30d158;
+  --color-node-issue: #ff9f0a;
+  --color-node-indicator: #bf5af2;
+  --color-node-place: #ff453a;
+
+  /* Borders */
+  --color-hairline: #e0e0e0;
+
+  /* Semantic */
+  --color-success: #34c759;
+  --color-error: #ff3b30;
+  --color-warning: #ff9500;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-20: 80px;
+
+  /* Border radius */
+  --radius-sm: 8px;
+  --radius-md: 11px;
+  --radius-lg: 18px;
+  --radius-pill: 9999px;
+
+  /* Nav */
+  --nav-height: 52px;
+  --bottom-nav-height: 56px;
+
+  /* Typography */
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+}
