@@ -1,58 +1,28 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useQuery, useQueries, useMutation } from '@tanstack/react-query';
+import {
+  forceSimulation,
+  forceLink,
+  forceManyBody,
+  forceCenter,
+  forceCollide,
+  forceX,
+  forceY,
+} from 'd3-force';
+import type { SimulationNodeDatum, SimulationLinkDatum, Simulation } from 'd3-force';
 import { graphApi } from '../api/graph';
 import { useAuthStore } from '../store/authStore';
+import { useTheme } from '../hooks/useTheme';
 import BottomNav, { type BottomNavTab } from '../components/layout/BottomNav';
 import BottomSheet from '../components/common/BottomSheet';
-import type { GraphNodeResponse, GraphEdgeResponse, NodeSummaryResponse } from '../types';
+import type { GraphNodeResponse, NodeSummaryResponse } from '../types';
 import { MOCK_TABS, MOCK_GRAPH, MOCK_SUMMARIES } from '../mocks';
 import styles from './GraphPage.module.css';
 
-// ─── Layout helpers ───────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const SVG_W = 500;
 const SVG_H = 540;
-
-function layoutNodes(
-  nodes: GraphNodeResponse[],
-  edges: GraphEdgeResponse[],
-): Map<number, { x: number; y: number }> {
-  const pos = new Map<number, { x: number; y: number }>();
-  if (nodes.length === 0) return pos;
-
-  // Degree centrality to find hub nodes
-  const degree = new Map<number, number>();
-  edges.forEach(({ source, target }) => {
-    degree.set(source, (degree.get(source) ?? 0) + 1);
-    degree.set(target, (degree.get(target) ?? 0) + 1);
-  });
-
-  const sorted = [...nodes].sort(
-    (a, b) => (degree.get(b.id) ?? 0) - (degree.get(a.id) ?? 0),
-  );
-
-  const cx = SVG_W / 2;
-  const cy = SVG_H / 2;
-  const count = sorted.length;
-
-  sorted.forEach((node, i) => {
-    if (i === 0) {
-      pos.set(node.id, { x: cx, y: cy });
-    } else {
-      const ring = Math.ceil(i / 6);
-      const posInRing = ((i - 1) % 6) + 1;
-      const total = Math.min(6, count - 6 * (ring - 1));
-      const angle = ((posInRing - 1) / total) * 2 * Math.PI - Math.PI / 2;
-      const r = ring * 130;
-      pos.set(node.id, {
-        x: cx + r * Math.cos(angle),
-        y: cy + r * Math.sin(angle),
-      });
-    }
-  });
-
-  return pos;
-}
 
 function nodeColor(persona: string): string {
   const map: Record<string, string> = {
@@ -67,60 +37,96 @@ function nodeColor(persona: string): string {
 }
 
 function nodeRadius(score: number): number {
-  return 14 + score * 12;
+  return 5 + score * 9;
 }
 
-// ─── GraphPage ─────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
+type SimNode = GraphNodeResponse & SimulationNodeDatum;
+type SimLink = SimulationLinkDatum<SimNode> & { weight: number };
 type ScrappedNode = { id: number; label: string; persona: string; summary: string };
+
+// ─── GraphPage ────────────────────────────────────────────────────────────────
 
 export default function GraphPage() {
   const { logout } = useAuthStore();
+  const { theme, toggleTheme } = useTheme();
 
   const [activeTab, setActiveTab] = useState<BottomNavTab>('graph');
-  const [selectedKeywordId, setSelectedKeywordId] = useState<number | null>(null);
+  const [highlightKeywordId, setHighlightKeywordId] = useState<number | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null);
+  const [hoveredNodeId, setHoveredNodeId] = useState<number | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [scrappedNodes, setScrappedNodes] = useState<Map<number, ScrappedNode>>(new Map());
 
-  // Pan/zoom state
+  // Pan/zoom
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
+  const transformRef = useRef(transform);
+  useEffect(() => { transformRef.current = transform; }, [transform]);
+
   const svgRef = useRef<SVGSVGElement>(null);
   const isPanning = useRef(false);
   const panStart = useRef({ x: 0, y: 0 });
   const lastTransform = useRef(transform);
   const pinchDist = useRef<number | null>(null);
 
+  // Force simulation
+  const simNodesRef = useRef<SimNode[]>([]);
+  const simulationRef = useRef<Simulation<SimNode, SimLink> | null>(null);
+  const [positions, setPositions] = useState<Map<number, { x: number; y: number }>>(new Map());
+
+  // Drag
+  const dragNodeRef = useRef<SimNode | null>(null);
+  const dragMoved = useRef(false);
+
   // ── Queries ──────────────────────────────────────────────────────────────────
 
   const { data: tabsData, isLoading: tabsLoading } = useQuery({
     queryKey: ['tabs'],
-    queryFn: () =>
-      graphApi.getTabs().then((r) => r.data.data).catch(() => MOCK_TABS),
+    queryFn: () => graphApi.getTabs().then((r) => r.data.data).catch(() => MOCK_TABS),
     placeholderData: MOCK_TABS,
   });
 
   const tabs = tabsData?.tabs ?? MOCK_TABS.tabs;
 
-  // Auto-select first tab
-  useEffect(() => {
-    if (tabs.length > 0 && selectedKeywordId === null) {
-      setSelectedKeywordId(tabs[0].id);
-    }
-  }, [tabs, selectedKeywordId]);
-
-  const { data: graphData, isLoading: graphLoading } = useQuery({
-    queryKey: ['graph', selectedKeywordId],
-    queryFn: () =>
-      graphApi
-        .getGraphData(selectedKeywordId!)
-        .then((r) => r.data.data)
-        .catch(() => MOCK_GRAPH[selectedKeywordId!] ?? MOCK_GRAPH[1]),
-    enabled: selectedKeywordId !== null,
-    placeholderData: selectedKeywordId !== null
-      ? (MOCK_GRAPH[selectedKeywordId] ?? MOCK_GRAPH[1])
-      : undefined,
+  // 모든 탭의 그래프를 동시에 fetch
+  const graphQueries = useQueries({
+    queries: tabs.map((tab) => ({
+      queryKey: ['graph', tab.id],
+      queryFn: () =>
+        graphApi
+          .getGraphData(tab.id)
+          .then((r) => r.data.data)
+          .catch(() => MOCK_GRAPH[tab.id] ?? MOCK_GRAPH[1]),
+      placeholderData: MOCK_GRAPH[tab.id] ?? MOCK_GRAPH[1],
+    })),
   });
+
+  const graphLoading = graphQueries.some((q) => q.isLoading && !q.data);
+
+  // 노드/엣지 합산 (중복 제거) + 탭별 nodeId Set
+  const { allNodes, allEdges, tabNodeIds } = useMemo(() => {
+    const nodeMap = new Map<number, GraphNodeResponse>();
+    const edgeKey = new Set<string>();
+    const edges: { source: number; target: number; weight: number }[] = [];
+    const tabNodeIds = new Map<number, Set<number>>();
+
+    tabs.forEach((tab, i) => {
+      const data = graphQueries[i]?.data;
+      if (!data) return;
+
+      const ids = new Set<number>();
+      data.nodes.forEach((n) => { nodeMap.set(n.id, n); ids.add(n.id); });
+      tabNodeIds.set(tab.id, ids);
+
+      data.edges.forEach((e) => {
+        const k = `${Math.min(e.source, e.target)}-${Math.max(e.source, e.target)}`;
+        if (!edgeKey.has(k)) { edgeKey.add(k); edges.push(e); }
+      });
+    });
+
+    return { allNodes: [...nodeMap.values()], allEdges: edges, tabNodeIds };
+  }, [tabs, graphQueries]);
 
   const { data: nodeSummary, isLoading: summaryLoading } = useQuery<NodeSummaryResponse | null>({
     queryKey: ['nodeSummary', selectedNodeId],
@@ -132,12 +138,10 @@ export default function GraphPage() {
         .catch(() => MOCK_SUMMARIES[selectedNodeId] ?? null);
     },
     enabled: selectedNodeId !== null && sheetOpen,
-    placeholderData: selectedNodeId !== null
-      ? (MOCK_SUMMARIES[selectedNodeId] ?? null)
-      : null,
+    placeholderData: selectedNodeId !== null ? (MOCK_SUMMARIES[selectedNodeId] ?? null) : null,
   });
 
-  // ── Mutations ────────────────────────────────────────────────────────────────
+  // ── Scrap mutation ────────────────────────────────────────────────────────────
 
   const scrapMutation = useMutation({
     mutationFn: (node: ScrappedNode) =>
@@ -154,47 +158,134 @@ export default function GraphPage() {
     },
   });
 
-  // ── Graph layout ─────────────────────────────────────────────────────────────
+  // ── Force simulation ──────────────────────────────────────────────────────────
 
-  const nodes = graphData?.nodes ?? [];
-  const edges = graphData?.edges ?? [];
-  const positions = layoutNodes(nodes, edges);
+  useEffect(() => {
+    if (allNodes.length === 0) return;
 
-  // ── Pan/Zoom handlers ─────────────────────────────────────────────────────────
+    simulationRef.current?.stop();
 
-  const onPointerDown = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
-    if (e.target !== svgRef.current && !(e.target as Element).classList.contains('bg')) return;
+    const simNodes: SimNode[] = allNodes.map((n) => {
+      const existing = simNodesRef.current.find((s) => s.id === n.id);
+      return existing
+        ? { ...n, x: existing.x ?? SVG_W / 2, y: existing.y ?? SVG_H / 2 }
+        : { ...n, x: SVG_W / 2 + (Math.random() - 0.5) * 100, y: SVG_H / 2 + (Math.random() - 0.5) * 100 };
+    });
+    simNodesRef.current = simNodes;
+
+    const simLinks: SimLink[] = allEdges.map((e) => ({
+      source: e.source as unknown as SimNode,
+      target: e.target as unknown as SimNode,
+      weight: e.weight,
+    }));
+
+    const sim = forceSimulation<SimNode>(simNodes)
+      .force(
+        'link',
+        forceLink<SimNode, SimLink>(simLinks)
+          .id((d) => d.id)
+          .distance((l) => 110 + (1 - l.weight) * 60)
+          .strength(0.3),
+      )
+      .force('charge', forceManyBody<SimNode>().strength(-80))
+      .force('center', forceCenter<SimNode>(SVG_W / 2, SVG_H / 2).strength(0.05))
+      .force('x', forceX<SimNode>(SVG_W / 2).strength(0.03))
+      .force('y', forceY<SimNode>(SVG_H / 2).strength(0.03))
+      .force('collide', forceCollide<SimNode>((d) => nodeRadius(d.score) + 6))
+      .alphaDecay(0.025)
+      .on('tick', () => {
+        const map = new Map<number, { x: number; y: number }>();
+        simNodesRef.current.forEach((n) => map.set(n.id, { x: n.x ?? 0, y: n.y ?? 0 }));
+        setPositions(new Map(map));
+      });
+
+    simulationRef.current = sim;
+    return () => { sim.stop(); };
+  }, [allNodes, allEdges]);
+
+  // ── Highlight logic ───────────────────────────────────────────────────────────
+
+  // 탭 하이라이트 대상 노드들
+  const tabHighlightIds = useMemo(() => {
+    if (highlightKeywordId === null) return null;
+    return tabNodeIds.get(highlightKeywordId) ?? null;
+  }, [highlightKeywordId, tabNodeIds]);
+
+  // 호버 인접 노드들
+  const hoverAdjacentIds = useMemo(() => {
+    if (hoveredNodeId === null) return null;
+    const set = new Set<number>([hoveredNodeId]);
+    allEdges.forEach((e) => {
+      if (e.source === hoveredNodeId) set.add(e.target);
+      if (e.target === hoveredNodeId) set.add(e.source);
+    });
+    return set;
+  }, [hoveredNodeId, allEdges]);
+
+  function isDimmed(nodeId: number): boolean {
+    // 호버 중이면 호버 기준 우선
+    if (hoverAdjacentIds !== null) return !hoverAdjacentIds.has(nodeId);
+    // 탭 하이라이트 중이면 탭 기준
+    if (tabHighlightIds !== null) return !tabHighlightIds.has(nodeId);
+    return false;
+  }
+
+  function isHighlighted(nodeId: number): boolean {
+    if (hoverAdjacentIds !== null) return hoverAdjacentIds.has(nodeId);
+    if (tabHighlightIds !== null) return tabHighlightIds.has(nodeId);
+    return false;
+  }
+
+  // ── SVG coordinate helper ─────────────────────────────────────────────────────
+
+  const toSvgCoords = useCallback((clientX: number, clientY: number) => {
+    const rect = svgRef.current!.getBoundingClientRect();
+    const { x, y, scale } = transformRef.current;
+    const svgX = (clientX - rect.left) * (SVG_W / rect.width);
+    const svgY = (clientY - rect.top) * (SVG_H / rect.height);
+    return { x: (svgX - x) / scale, y: (svgY - y) / scale };
+  }, []);
+
+  // ── Pan handlers ──────────────────────────────────────────────────────────────
+
+  const onBgPointerDown = useCallback((e: React.PointerEvent<SVGRectElement>) => {
     isPanning.current = true;
     panStart.current = { x: e.clientX, y: e.clientY };
-    lastTransform.current = transform;
+    lastTransform.current = transformRef.current;
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
-  }, [transform]);
+  }, []);
 
-  const onPointerMove = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
+  const onSvgPointerMove = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
+    if (dragNodeRef.current) {
+      dragMoved.current = true;
+      const { x, y } = toSvgCoords(e.clientX, e.clientY);
+      dragNodeRef.current.fx = x;
+      dragNodeRef.current.fy = y;
+      simulationRef.current?.alphaTarget(0.3).restart();
+      return;
+    }
     if (!isPanning.current) return;
     const dx = e.clientX - panStart.current.x;
     const dy = e.clientY - panStart.current.y;
-    setTransform({
-      ...lastTransform.current,
-      x: lastTransform.current.x + dx,
-      y: lastTransform.current.y + dy,
-    });
-  }, []);
+    setTransform({ ...lastTransform.current, x: lastTransform.current.x + dx, y: lastTransform.current.y + dy });
+  }, [toSvgCoords]);
 
-  const onPointerUp = useCallback(() => {
+  const onSvgPointerUp = useCallback(() => {
     isPanning.current = false;
+    if (dragNodeRef.current) {
+      dragNodeRef.current.fx = null;
+      dragNodeRef.current.fy = null;
+      simulationRef.current?.alphaTarget(0);
+      dragNodeRef.current = null;
+    }
   }, []);
 
   const onWheel = useCallback((e: React.WheelEvent<SVGSVGElement>) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    setTransform((prev) => ({
-      ...prev,
-      scale: Math.min(3, Math.max(0.3, prev.scale * delta)),
-    }));
+    setTransform((prev) => ({ ...prev, scale: Math.min(4, Math.max(0.2, prev.scale * delta)) }));
   }, []);
 
-  // Touch pinch
   const onTouchStart = useCallback((e: React.TouchEvent<SVGSVGElement>) => {
     if (e.touches.length === 2) {
       const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -208,25 +299,40 @@ export default function GraphPage() {
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       const newDist = Math.sqrt(dx * dx + dy * dy);
-      const ratio = newDist / pinchDist.current;
-      pinchDist.current = newDist;
       setTransform((prev) => ({
         ...prev,
-        scale: Math.min(3, Math.max(0.3, prev.scale * ratio)),
+        scale: Math.min(4, Math.max(0.2, prev.scale * (newDist / pinchDist.current!))),
       }));
+      pinchDist.current = newDist;
     }
   }, []);
 
-  // ── Node click ────────────────────────────────────────────────────────────────
+  // ── Node drag handlers ────────────────────────────────────────────────────────
 
-  const onNodeClick = (nodeId: number) => {
-    setSelectedNodeId(nodeId);
-    setSheetOpen(true);
-  };
+  const onNodePointerDown = useCallback((e: React.PointerEvent<SVGCircleElement>, node: SimNode) => {
+    e.stopPropagation();
+    dragNodeRef.current = node;
+    dragMoved.current = false;
+    node.fx = node.x;
+    node.fy = node.y;
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+  }, []);
 
-  const handleRecenter = () => {
-    setTransform({ x: 0, y: 0, scale: 1 });
-  };
+  const onNodePointerUp = useCallback((e: React.PointerEvent<SVGCircleElement>, nodeId: number) => {
+    e.stopPropagation();
+    if (!dragMoved.current) {
+      setSelectedNodeId(nodeId);
+      setSheetOpen(true);
+    }
+    if (dragNodeRef.current) {
+      dragNodeRef.current.fx = null;
+      dragNodeRef.current.fy = null;
+      simulationRef.current?.alphaTarget(0);
+      dragNodeRef.current = null;
+    }
+  }, []);
+
+  const handleRecenter = () => setTransform({ x: 0, y: 0, scale: 1 });
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -248,26 +354,36 @@ export default function GraphPage() {
           </svg>
           <span>Nodingo</span>
         </div>
-        <button className={styles.logoutBtn} onClick={logout}>로그아웃</button>
+        <div className={styles.topBarActions}>
+          <button className={styles.themeToggle} onClick={toggleTheme} title={theme === 'dark' ? '라이트 모드' : '다크 모드'}>
+            {theme === 'dark' ? (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+                <circle cx="12" cy="12" r="5" />
+                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+                <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+              </svg>
+            )}
+          </button>
+          <button className={styles.logoutBtn} onClick={logout}>로그아웃</button>
+        </div>
       </header>
 
-      {/* Tab chips */}
+      {/* Keyword filter chips */}
       {activeTab === 'graph' && (
         <div className={styles.tabs}>
           {tabsLoading
-            ? Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className={styles.tabSkeleton} />
-              ))
+            ? Array.from({ length: 3 }).map((_, i) => <div key={i} className={styles.tabSkeleton} />)
             : tabs.map((tab) => (
                 <button
                   key={tab.id}
                   className={[
                     styles.tab,
-                    selectedKeywordId === tab.id ? styles.tabActive : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  onClick={() => setSelectedKeywordId(tab.id)}
+                    highlightKeywordId === tab.id ? styles.tabActive : '',
+                  ].filter(Boolean).join(' ')}
+                  onClick={() => setHighlightKeywordId((prev) => (prev === tab.id ? null : tab.id))}
                 >
                   {tab.keyword}
                 </button>
@@ -290,89 +406,93 @@ export default function GraphPage() {
                 ref={svgRef}
                 className={styles.svg}
                 viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-                onPointerDown={onPointerDown}
-                onPointerMove={onPointerMove}
-                onPointerUp={onPointerUp}
-                onPointerCancel={onPointerUp}
+                onPointerMove={onSvgPointerMove}
+                onPointerUp={onSvgPointerUp}
+                onPointerCancel={onSvgPointerUp}
                 onWheel={onWheel}
                 onTouchStart={onTouchStart}
                 onTouchMove={onTouchMove}
                 style={{ touchAction: 'none' }}
               >
-                {/* Click-through background */}
-                <rect
-                  className="bg"
-                  x="0"
-                  y="0"
-                  width={SVG_W}
-                  height={SVG_H}
-                  fill="transparent"
-                />
-                <g
-                  transform={`translate(${transform.x}, ${transform.y}) scale(${transform.scale})`}
-                  style={{ transformOrigin: `${SVG_W / 2}px ${SVG_H / 2}px` }}
-                >
+                <defs>
+                  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="4" result="blur" />
+                    <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                  </filter>
+                  <filter id="glow-sm" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="2" result="blur" />
+                    <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                  </filter>
+                </defs>
+
+                <rect x="0" y="0" width={SVG_W} height={SVG_H} fill="transparent" onPointerDown={onBgPointerDown} />
+
+                <g transform={`translate(${transform.x},${transform.y}) scale(${transform.scale})`}>
                   {/* Edges */}
-                  {edges.map((edge, i) => {
+                  {allEdges.map((edge, i) => {
                     const src = positions.get(edge.source);
                     const tgt = positions.get(edge.target);
                     if (!src || !tgt) return null;
+                    const srcDimmed = isDimmed(edge.source);
+                    const tgtDimmed = isDimmed(edge.target);
+                    const edgeDimmed = srcDimmed || tgtDimmed;
+                    const edgeHighlighted = isHighlighted(edge.source) && isHighlighted(edge.target);
+
                     return (
                       <line
                         key={i}
-                        x1={src.x}
-                        y1={src.y}
-                        x2={tgt.x}
-                        y2={tgt.y}
-                        stroke="#0066cc"
-                        strokeWidth={Math.max(0.5, edge.weight * 2)}
-                        strokeOpacity={0.2 + edge.weight * 0.3}
+                        x1={src.x} y1={src.y} x2={tgt.x} y2={tgt.y}
+                        stroke={edgeHighlighted ? '#ffffff' : 'var(--theme-text)'}
+                        strokeWidth={edgeHighlighted ? edge.weight * 2 : 0.6}
+                        strokeOpacity={edgeDimmed ? 0.04 : edgeHighlighted ? 0.55 : 0.18}
+                        style={{ transition: 'stroke-opacity 0.2s' }}
                       />
                     );
                   })}
 
                   {/* Nodes */}
-                  {nodes.map((node) => {
+                  {allNodes.map((node) => {
                     const p = positions.get(node.id);
                     if (!p) return null;
                     const r = nodeRadius(node.score);
                     const color = nodeColor(node.persona);
                     const isSelected = node.id === selectedNodeId;
+                    const dimmed = isDimmed(node.id);
+                    const highlighted = isHighlighted(node.id);
+                    const simNode = simNodesRef.current.find((s) => s.id === node.id)!;
 
                     return (
                       <g
                         key={node.id}
-                        className={styles.nodeGroup}
-                        onClick={() => onNodeClick(node.id)}
-                        style={{ cursor: 'pointer' }}
+                        style={{ cursor: 'grab' }}
+                        onMouseEnter={() => setHoveredNodeId(node.id)}
+                        onMouseLeave={() => setHoveredNodeId(null)}
                       >
+                        {isSelected && (
+                          <circle cx={p.x} cy={p.y} r={r + 6} fill={color} fillOpacity={0.2} filter="url(#glow)" />
+                        )}
+                        {(highlighted || isSelected) && (
+                          <circle cx={p.x} cy={p.y} r={r + 3} fill="none" stroke={color} strokeWidth={1} strokeOpacity={0.5} />
+                        )}
                         <circle
-                          cx={p.x}
-                          cy={p.y}
-                          r={r + 4}
+                          cx={p.x} cy={p.y} r={r}
                           fill={color}
-                          fillOpacity={isSelected ? 0.2 : 0.1}
-                        />
-                        <circle
-                          cx={p.x}
-                          cy={p.y}
-                          r={r}
-                          fill={color}
-                          fillOpacity={0.85}
-                          stroke={isSelected ? '#fff' : color}
-                          strokeWidth={isSelected ? 2.5 : 0}
+                          fillOpacity={dimmed ? 0.12 : highlighted || isSelected ? 1 : 0.8}
+                          filter={highlighted || isSelected ? 'url(#glow-sm)' : undefined}
+                          style={{ transition: 'fill-opacity 0.2s', cursor: 'grab' }}
+                          onPointerDown={(e) => onNodePointerDown(e, simNode)}
+                          onPointerUp={(e) => onNodePointerUp(e, node.id)}
                         />
                         <text
-                          x={p.x}
-                          y={p.y + 1}
+                          x={p.x} y={p.y + r + 11}
                           textAnchor="middle"
-                          dominantBaseline="middle"
-                          fontSize={Math.max(9, r * 0.55)}
-                          fill="#fff"
-                          fontWeight="600"
-                          style={{ userSelect: 'none', pointerEvents: 'none' }}
+                          fontSize={10}
+                          fill="var(--theme-text)"
+                          fillOpacity={dimmed ? 0.2 : highlighted || isSelected ? 1 : 0.8}
+                          fontWeight={highlighted || isSelected ? '700' : '500'}
+                          style={{ userSelect: 'none', pointerEvents: 'none', transition: 'fill-opacity 0.2s' }}
                         >
-                          {node.label.length > 6 ? node.label.slice(0, 6) : node.label}
+                          {node.label}
                         </text>
                       </g>
                     );
@@ -381,7 +501,6 @@ export default function GraphPage() {
               </svg>
             )}
 
-            {/* Recenter FAB */}
             <button className={styles.recenterFab} onClick={handleRecenter} title="재중앙">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="3" />
@@ -389,15 +508,10 @@ export default function GraphPage() {
               </svg>
             </button>
 
-            {/* Legend */}
             <div className={styles.legend}>
               {[
-                ['경제', '#ff9f0a'],
-                ['정치', '#0a84ff'],
-                ['기술', '#30d158'],
-                ['사회', '#bf5af2'],
-                ['문화', '#ff453a'],
-                ['국제', '#64d2ff'],
+                ['경제', '#ff9f0a'], ['정치', '#0a84ff'], ['기술', '#30d158'],
+                ['사회', '#bf5af2'], ['문화', '#ff453a'], ['국제', '#64d2ff'],
               ].map(([label, color]) => (
                 <div key={label} className={styles.legendItem}>
                   <span className={styles.legendDot} style={{ background: color }} />
@@ -424,12 +538,7 @@ export default function GraphPage() {
                       <span className={styles.scrapCardWord}>{node.label}</span>
                       <span className={styles.scrapCardPersona}>{node.persona}</span>
                     </div>
-                    <button
-                      className={styles.unscrapBtn}
-                      onClick={() => scrapMutation.mutate(node)}
-                    >
-                      해제
-                    </button>
+                    <button className={styles.unscrapBtn} onClick={() => scrapMutation.mutate(node)}>해제</button>
                   </div>
                   <p className={styles.scrapCardSummary}>{node.summary}</p>
                 </div>
@@ -439,9 +548,7 @@ export default function GraphPage() {
         )}
 
         {activeTab === 'feed' && (
-          <div className={styles.emptyState}>
-            <p>피드 준비 중</p>
-          </div>
+          <div className={styles.emptyState}><p>피드 준비 중</p></div>
         )}
 
         {activeTab === 'profile' && (
@@ -449,30 +556,22 @@ export default function GraphPage() {
             <div className={styles.profileCard}>
               <div className={styles.profileAvatar}>N</div>
               <p className={styles.profileName}>Nodingo 사용자</p>
-              <button
-                className={styles.profileLogout}
-                onClick={logout}
-              >
-                로그아웃
-              </button>
+              <button className={styles.profileLogout} onClick={logout}>로그아웃</button>
             </div>
           </div>
         )}
       </main>
 
-      {/* Bottom Nav */}
       <BottomNav active={activeTab} onChange={setActiveTab} />
 
-      {/* Node Detail Sheet */}
+      {/* Node detail sheet */}
       <BottomSheet
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
         title={summaryLoading ? '로딩 중...' : (nodeSummary?.word ?? '')}
       >
         {summaryLoading ? (
-          <div className={styles.sheetLoader}>
-            <div className={styles.spinner} />
-          </div>
+          <div className={styles.sheetLoader}><div className={styles.spinner} /></div>
         ) : nodeSummary ? (
           <div className={styles.sheetContent}>
             <div className={styles.sheetMeta}>

@@ -16,12 +16,13 @@
 .sheet {
   width: 100%;
   max-height: 85vh;
-  background-color: var(--color-canvas);
+  background-color: var(--theme-surface);
   border-radius: 20px 20px 0 0;
   padding: 12px 0 env(safe-area-inset-bottom);
   display: flex;
   flex-direction: column;
   animation: slideUp 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: background-color var(--transition-normal);
 }
 
 @keyframes slideUp {
@@ -32,7 +33,7 @@
 .handle {
   width: 36px;
   height: 4px;
-  background-color: var(--color-hairline);
+  background-color: var(--theme-handle);
   border-radius: var(--radius-pill);
   margin: 0 auto 16px;
   flex-shrink: 0;
@@ -41,8 +42,9 @@
 .title {
   font-size: 17px;
   font-weight: 700;
+  color: var(--theme-text);
   padding: 0 20px 12px;
-  border-bottom: 1px solid var(--color-hairline);
+  border-bottom: 1px solid var(--theme-border);
   flex-shrink: 0;
 }
 
