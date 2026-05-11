@@ -12,4 +12,10 @@ export const graphApi = {
 
   getNodeSummary: (nodeId: number) =>
     apiClient.get<ApiResponse<NodeSummaryResponse>>(`/api/graphs/nodes/${nodeId}/summaries`),
+
+  scrapKeyword: (keywordId: number) =>
+    apiClient.post<ApiResponse<void>>(`/api/keywords/${keywordId}/scrap`),
+
+  unscrapKeyword: (keywordId: number) =>
+    apiClient.delete<ApiResponse<void>>(`/api/keywords/${keywordId}/scrap`),
 };
