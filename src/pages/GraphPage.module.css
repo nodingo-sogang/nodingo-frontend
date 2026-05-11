@@ -338,3 +338,113 @@
   text-align: center;
   padding: 32px;
 }
+
+/* Scrap button in BottomSheet */
+.scrapBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid rgba(0, 102, 204, 0.4);
+  color: var(--color-primary);
+  background: none;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all var(--transition-fast);
+}
+
+.scrapBtn:hover {
+  background-color: rgba(0, 102, 204, 0.08);
+}
+
+.scrapBtnActive {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+.scrapBtnActive:hover {
+  background-color: rgba(0, 102, 204, 0.85);
+}
+
+/* Scrap tab list */
+.scrapList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  overflow-y: auto;
+  height: 100%;
+}
+
+.scrapCard {
+  background-color: var(--color-surface-tile-1);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scrapCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.scrapCardLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scrapCardDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.scrapCardWord {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.scrapCardPersona {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-primary);
+  background-color: rgba(0, 102, 204, 0.1);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+}
+
+.scrapCardSummary {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-muted);
+}
+
+.unscrapBtn {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.5);
+  background: none;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all var(--transition-fast);
+}
+
+.unscrapBtn:hover {
+  border-color: rgba(255, 85, 85, 0.5);
+  color: rgba(255, 85, 85, 0.8);
+}

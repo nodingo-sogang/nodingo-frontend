@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { graphApi } from '../api/graph';
-import { newsApi } from '../api/news';
 import { useAuthStore } from '../store/authStore';
 import BottomNav, { type BottomNavTab } from '../components/layout/BottomNav';
 import BottomSheet from '../components/common/BottomSheet';
@@ -73,6 +72,8 @@ function nodeRadius(score: number): number {
 
 // ─── GraphPage ─────────────────────────────────────────────────────────────────
 
+type ScrappedNode = { id: number; label: string; persona: string; summary: string };
+
 export default function GraphPage() {
   const { logout } = useAuthStore();
 
@@ -80,7 +81,7 @@ export default function GraphPage() {
   const [selectedKeywordId, setSelectedKeywordId] = useState<number | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [scrapped, setScrapped] = useState<Set<number>>(new Set());
+  const [scrappedNodes, setScrappedNodes] = useState<Map<number, ScrappedNode>>(new Map());
 
   // Pan/zoom state
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
@@ -139,13 +140,15 @@ export default function GraphPage() {
   // ── Mutations ────────────────────────────────────────────────────────────────
 
   const scrapMutation = useMutation({
-    mutationFn: (newsId: number) =>
-      scrapped.has(newsId) ? newsApi.unscrap(newsId) : newsApi.scrap(newsId),
-    onSuccess: (_data, newsId) => {
-      setScrapped((prev) => {
-        const next = new Set(prev);
-        if (next.has(newsId)) next.delete(newsId);
-        else next.add(newsId);
+    mutationFn: (node: ScrappedNode) =>
+      scrappedNodes.has(node.id)
+        ? graphApi.unscrapKeyword(node.id)
+        : graphApi.scrapKeyword(node.id),
+    onMutate: (node) => {
+      setScrappedNodes((prev) => {
+        const next = new Map(prev);
+        if (next.has(node.id)) next.delete(node.id);
+        else next.set(node.id, node);
         return next;
       });
     },
@@ -406,10 +409,33 @@ export default function GraphPage() {
         )}
 
         {activeTab === 'scrap' && (
-          <div className={styles.emptyState}>
-            <p>스크랩한 뉴스가 없어요</p>
-            <p className={styles.emptyHint}>그래프에서 뉴스를 스크랩해보세요</p>
-          </div>
+          scrappedNodes.size === 0 ? (
+            <div className={styles.emptyState}>
+              <p>스크랩한 키워드가 없어요</p>
+              <p className={styles.emptyHint}>그래프에서 노드를 스크랩해보세요</p>
+            </div>
+          ) : (
+            <div className={styles.scrapList}>
+              {[...scrappedNodes.values()].map((node) => (
+                <div key={node.id} className={styles.scrapCard}>
+                  <div className={styles.scrapCardHeader}>
+                    <div className={styles.scrapCardLabel}>
+                      <span className={styles.scrapCardDot} style={{ background: nodeColor(node.persona) }} />
+                      <span className={styles.scrapCardWord}>{node.label}</span>
+                      <span className={styles.scrapCardPersona}>{node.persona}</span>
+                    </div>
+                    <button
+                      className={styles.unscrapBtn}
+                      onClick={() => scrapMutation.mutate(node)}
+                    >
+                      해제
+                    </button>
+                  </div>
+                  <p className={styles.scrapCardSummary}>{node.summary}</p>
+                </div>
+              ))}
+            </div>
+          )
         )}
 
         {activeTab === 'feed' && (
@@ -451,46 +477,27 @@ export default function GraphPage() {
           <div className={styles.sheetContent}>
             <div className={styles.sheetMeta}>
               <span className={styles.sheetPersona}>{nodeSummary.persona}</span>
+              <button
+                className={`${styles.scrapBtn} ${scrappedNodes.has(selectedNodeId!) ? styles.scrapBtnActive : ''}`}
+                onClick={() => scrapMutation.mutate({
+                  id: selectedNodeId!,
+                  label: nodeSummary.word,
+                  persona: nodeSummary.persona,
+                  summary: nodeSummary.summary,
+                })}
+              >
+                <svg viewBox="0 0 24 24" fill={scrappedNodes.has(selectedNodeId!) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" width="14" height="14">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
+                </svg>
+                {scrappedNodes.has(selectedNodeId!) ? '스크랩됨' : '스크랩'}
+              </button>
             </div>
             <p className={styles.sheetSummary}>{nodeSummary.summary}</p>
-
-            <h4 className={styles.sheetNewsTitle}>관련 뉴스</h4>
-            <NewsListForNode
-              nodeId={selectedNodeId!}
-              scrapped={scrapped}
-              onScrap={(id) => scrapMutation.mutate(id)}
-            />
           </div>
         ) : (
           <p className={styles.sheetEmpty}>요약 정보가 없습니다.</p>
         )}
       </BottomSheet>
-    </div>
-  );
-}
-
-// ─── NewsListForNode ───────────────────────────────────────────────────────────
-
-function NewsListForNode({
-  nodeId: _nodeId,
-  scrapped: _scrapped,
-  onScrap: _onScrap,
-}: {
-  nodeId: number;
-  scrapped: Set<number>;
-  onScrap: (id: number) => void;
-}) {
-  // In the current API there's no "news by node" list endpoint,
-  // so we show a placeholder list that links to the node's related news
-  // when that endpoint becomes available.
-  return (
-    <div className={styles.newsList}>
-      <div className={styles.newsPlaceholder}>
-        <p>이 노드와 연결된 뉴스 목록은 추후 제공될 예정입니다.</p>
-        <p className={styles.emptyHint}>
-          뉴스 ID를 알고 있다면 직접 스크랩할 수 있습니다.
-        </p>
-      </div>
     </div>
   );
 }
