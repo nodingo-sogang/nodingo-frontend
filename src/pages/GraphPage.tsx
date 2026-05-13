@@ -92,13 +92,13 @@ export default function GraphPage() {
   // 모든 탭의 그래프를 동시에 fetch
   const graphQueries = useQueries({
     queries: tabs.map((tab) => ({
-      queryKey: ['graph', tab.id],
+      queryKey: ['graph', tab.keywordId],
       queryFn: () =>
         graphApi
-          .getGraphData(tab.id)
+          .getGraphData(tab.keywordId)
           .then((r) => r.data.data)
-          .catch(() => MOCK_GRAPH[tab.id] ?? MOCK_GRAPH[1]),
-      placeholderData: MOCK_GRAPH[tab.id] ?? MOCK_GRAPH[1],
+          .catch(() => MOCK_GRAPH[tab.keywordId] ?? MOCK_GRAPH[1]),
+      placeholderData: MOCK_GRAPH[tab.keywordId] ?? MOCK_GRAPH[1],
     })),
   });
 
@@ -117,7 +117,7 @@ export default function GraphPage() {
 
       const ids = new Set<number>();
       data.nodes.forEach((n) => { nodeMap.set(n.id, n); ids.add(n.id); });
-      tabNodeIds.set(tab.id, ids);
+      tabNodeIds.set(tab.keywordId, ids);
 
       data.edges.forEach((e) => {
         const k = `${Math.min(e.source, e.target)}-${Math.max(e.source, e.target)}`;
@@ -378,14 +378,14 @@ export default function GraphPage() {
             ? Array.from({ length: 3 }).map((_, i) => <div key={i} className={styles.tabSkeleton} />)
             : tabs.map((tab) => (
                 <button
-                  key={tab.id}
+                  key={tab.keywordId}
                   className={[
                     styles.tab,
-                    highlightKeywordId === tab.id ? styles.tabActive : '',
+                    highlightKeywordId === tab.keywordId ? styles.tabActive : '',
                   ].filter(Boolean).join(' ')}
-                  onClick={() => setHighlightKeywordId((prev) => (prev === tab.id ? null : tab.id))}
+                  onClick={() => setHighlightKeywordId((prev) => (prev === tab.keywordId ? null : tab.keywordId))}
                 >
-                  {tab.keyword}
+                  {tab.word}
                 </button>
               ))}
         </div>

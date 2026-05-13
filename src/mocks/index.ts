@@ -8,9 +8,9 @@ import type {
 
 export const MOCK_TABS: TabListResponse = {
   tabs: [
-    { id: 1, keyword: '금리', persona: 'ECONOMY' },
-    { id: 2, keyword: 'AI 규제', persona: 'TECHNOLOGY' },
-    { id: 3, keyword: '대선', persona: 'POLITICS' },
+    { keywordId: 1, word: '금리', persona: 'ECONOMY' },
+    { keywordId: 2, word: 'AI 규제', persona: 'TECHNOLOGY' },
+    { keywordId: 3, word: '대선', persona: 'POLITICS' },
   ],
 };
 

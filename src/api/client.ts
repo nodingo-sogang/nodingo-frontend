@@ -80,7 +80,9 @@ apiClient.interceptors.response.use(
       const { data } = await axios.post<{
         success: boolean;
         data: { accessToken: string; refreshToken: string };
-      }>(`${BASE_URL}/auth/refresh`, { refreshToken });
+      }>(`${BASE_URL}/api/auth/refresh`, { refreshToken }, {
+        headers: { Authorization: original.headers.Authorization as string },
+      });
 
       const { accessToken, refreshToken: newRefresh } = data.data;
       tokenStorage.set(accessToken, newRefresh);
