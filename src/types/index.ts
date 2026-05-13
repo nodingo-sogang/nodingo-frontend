@@ -82,8 +82,8 @@ export interface OnboardingRequest {
 // ─── Graph ────────────────────────────────────────────────────────────────────
 
 export interface TabResponse {
-  id: number;
-  keyword: string;
+  keywordId: number;
+  word: string;
   persona: string;
 }
 
