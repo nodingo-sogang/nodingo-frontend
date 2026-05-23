@@ -51,7 +51,7 @@
 
   /* Nav */
   --nav-height: 52px;
-  --bottom-nav-height: 56px;
+  --bottom-nav-height: 80px;
 
   /* Typography */
   --font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -68,8 +68,12 @@
   --theme-text-muted: rgba(255, 255, 255, 0.45);
   --theme-border: rgba(255, 255, 255, 0.08);
   --theme-btn-border: rgba(255, 255, 255, 0.2);
-  --theme-nav-bg: rgba(28, 28, 30, 0.92);
+  --theme-nav-bg: rgba(28, 28, 30, 0.88);
   --theme-nav-border: rgba(255, 255, 255, 0.1);
+  --theme-nav-active-bg: rgba(41, 151, 255, 0.14);
+  --theme-nav-active-color: #2997ff;
+  --theme-nav-hover-bg: rgba(255, 255, 255, 0.06);
+  --theme-nav-inactive: rgba(255, 255, 255, 0.38);
   --theme-legend-bg: rgba(0, 0, 0, 0.55);
   --theme-fab-bg: rgba(255, 255, 255, 0.12);
   --theme-fab-border: rgba(255, 255, 255, 0.15);
@@ -84,8 +88,12 @@
   --theme-text-muted: rgba(0, 0, 0, 0.4);
   --theme-border: rgba(0, 0, 0, 0.08);
   --theme-btn-border: rgba(0, 0, 0, 0.18);
-  --theme-nav-bg: rgba(255, 255, 255, 0.92);
+  --theme-nav-bg: rgba(255, 255, 255, 0.88);
   --theme-nav-border: rgba(0, 0, 0, 0.08);
+  --theme-nav-active-bg: rgba(0, 102, 204, 0.10);
+  --theme-nav-active-color: #0066cc;
+  --theme-nav-hover-bg: rgba(0, 0, 0, 0.04);
+  --theme-nav-inactive: rgba(0, 0, 0, 0.35);
   --theme-legend-bg: rgba(255, 255, 255, 0.88);
   --theme-fab-bg: rgba(0, 0, 0, 0.06);
   --theme-fab-border: rgba(0, 0, 0, 0.1);
