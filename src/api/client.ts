@@ -79,12 +79,12 @@ apiClient.interceptors.response.use(
     try {
       const { data } = await axios.post<{
         success: boolean;
-        data: { accessToken: string; refreshToken: string };
-      }>(`${BASE_URL}/api/auth/refresh`, { refreshToken }, {
+        data: { access_token: string; refresh_token: string };
+      }>(`${BASE_URL}/api/auth/refresh`, { refresh_token: refreshToken }, {
         headers: { Authorization: original.headers.Authorization as string },
       });
 
-      const { accessToken, refreshToken: newRefresh } = data.data;
+      const { access_token: accessToken, refresh_token: newRefresh } = data.data;
       tokenStorage.set(accessToken, newRefresh);
       processQueue(null, accessToken);
       original.headers.Authorization = `Bearer ${accessToken}`;

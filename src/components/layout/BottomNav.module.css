@@ -1,16 +1,29 @@
+/* Outer container — transparent, only handles safe-area spacing */
 .nav {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   z-index: 100;
-  height: var(--bottom-nav-height);
-  background-color: var(--theme-nav-bg);
-  backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  border-top: 1px solid var(--theme-nav-border);
+  padding: 0 14px calc(12px + env(safe-area-inset-bottom));
+  background: transparent;
+  pointer-events: none;
+}
+
+/* Floating pill */
+.island {
+  pointer-events: all;
   display: flex;
-  padding-bottom: env(safe-area-inset-bottom);
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  background-color: var(--theme-nav-bg);
+  backdrop-filter: saturate(180%) blur(24px);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  border-radius: 22px;
+  border: 1px solid var(--theme-nav-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28), 0 2px 8px rgba(0, 0, 0, 0.16);
+  padding: 5px;
   transition: background-color var(--transition-normal);
 }
 
@@ -21,22 +34,29 @@
   align-items: center;
   justify-content: center;
   gap: 3px;
-  color: var(--theme-text-muted);
-  transition: color var(--transition-fast);
+  color: var(--theme-nav-inactive);
+  border-radius: 16px;
+  padding: 8px 4px;
+  transition: color var(--transition-fast), background-color var(--transition-fast);
   background: none;
   border: none;
   cursor: pointer;
-  padding: 8px 0;
+  font-family: inherit;
 }
 
-.item:hover,
+.item:hover {
+  color: var(--theme-nav-active-color);
+  background-color: var(--theme-nav-hover-bg);
+}
+
 .active {
-  color: var(--color-primary);
+  color: var(--theme-nav-active-color);
+  background-color: var(--theme-nav-active-bg);
 }
 
 .icon {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   display: flex;
 }
 
@@ -48,4 +68,5 @@
 .label {
   font-size: 10px;
   font-weight: 600;
+  letter-spacing: -0.1px;
 }

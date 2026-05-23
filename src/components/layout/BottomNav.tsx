@@ -1,6 +1,6 @@
 import styles from './BottomNav.module.css';
 
-export type BottomNavTab = 'graph' | 'scrap' | 'feed' | 'profile';
+export type BottomNavTab = 'graph' | 'scrap' | 'profile';
 
 interface BottomNavProps {
   active: BottomNavTab;
@@ -10,7 +10,7 @@ interface BottomNavProps {
 const TABS: { id: BottomNavTab; label: string; icon: React.ReactNode }[] = [
   {
     id: 'graph',
-    label: '그래프',
+    label: '나우',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <circle cx="12" cy="12" r="3" />
@@ -27,19 +27,10 @@ const TABS: { id: BottomNavTab; label: string; icon: React.ReactNode }[] = [
   },
   {
     id: 'scrap',
-    label: '스크랩',
+    label: '팔로우',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
-      </svg>
-    ),
-  },
-  {
-    id: 'feed',
-    label: '피드',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M4 6h16M4 12h16M4 18h10" />
       </svg>
     ),
   },
@@ -58,16 +49,18 @@ const TABS: { id: BottomNavTab; label: string; icon: React.ReactNode }[] = [
 export default function BottomNav({ active, onChange }: BottomNavProps) {
   return (
     <nav className={styles.nav}>
-      {TABS.map((tab) => (
-        <button
-          key={tab.id}
-          className={[styles.item, active === tab.id ? styles.active : ''].filter(Boolean).join(' ')}
-          onClick={() => onChange(tab.id)}
-        >
-          <span className={styles.icon}>{tab.icon}</span>
-          <span className={styles.label}>{tab.label}</span>
-        </button>
-      ))}
+      <div className={styles.island}>
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            className={[styles.item, active === tab.id ? styles.active : ''].filter(Boolean).join(' ')}
+            onClick={() => onChange(tab.id)}
+          >
+            <span className={styles.icon}>{tab.icon}</span>
+            <span className={styles.label}>{tab.label}</span>
+          </button>
+        ))}
+      </div>
     </nav>
   );
 }

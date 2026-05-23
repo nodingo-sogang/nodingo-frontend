@@ -1,12 +1,12 @@
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
 export interface TokenPair {
-  accessToken: string;
-  refreshToken: string;
+  access_token: string;
+  refresh_token: string;
 }
 
 export interface ReissueTokenRequest {
-  refreshToken: string;
+  refresh_token: string;
 }
 
 // ─── API Response wrapper ─────────────────────────────────────────────────────
@@ -18,13 +18,24 @@ export interface ApiResponse<T> {
   data: T | null;
 }
 
+export interface Pageable {
+  page_number: number;
+  page_size: number;
+  sort: string[];
+  offset: number;
+  paged: boolean;
+  unpaged: boolean;
+}
+
 export interface PageResponse<T> {
   content: T[];
-  page: number;
-  size: number;
+  pageable: Pageable;
   totalElements: number;
   totalPages: number;
   last: boolean;
+  first: boolean;
+  numberOfElements: number;
+  empty: boolean;
 }
 
 export interface SliceResponse<T> {
@@ -33,6 +44,11 @@ export interface SliceResponse<T> {
 }
 
 // ─── User / Onboarding ───────────────────────────────────────────────────────
+
+export interface UserProfileResponse {
+  name: string;
+  email: string;
+}
 
 export type UserPersona =
   | 'POLITICS'
@@ -70,8 +86,8 @@ export interface KeywordListResponse {
 }
 
 export interface OnboardingInterest {
-  macroKeywordId: number;
-  specificKeywordIds: number[];
+  macro_keyword_id: number;
+  specific_keyword_ids: number[];
 }
 
 export interface OnboardingRequest {
@@ -82,7 +98,7 @@ export interface OnboardingRequest {
 // ─── Graph ────────────────────────────────────────────────────────────────────
 
 export interface TabResponse {
-  keywordId: number;
+  keyword_id: number;
   word: string;
   persona: string;
 }
@@ -110,11 +126,17 @@ export interface GraphDataResponse {
   edges: GraphEdgeResponse[];
 }
 
+export interface NewsItemBrief {
+  id: number;
+  title: string;
+}
+
 export interface NodeSummaryResponse {
-  keywordId: number;
+  keyword_id: number;
   word: string;
   persona: string;
   summary: string;
+  news?: NewsItemBrief[];
 }
 
 // ─── News ─────────────────────────────────────────────────────────────────────
@@ -124,13 +146,25 @@ export interface NewsDetailResponse {
   title: string;
   body: string;
   url: string;
-  dateTimePub: string;
+  date_time_pub: string;
   keywords: string[];
 }
 
 // ─── Notification ─────────────────────────────────────────────────────────────
 
-export interface NotificationRequest {
-  notifyHour: number;
-  fcmToken: string;
+export interface OnboardingStatusResponse {
+  status: 'COMPLETED' | 'PENDING';
+}
+
+export interface NotificationSettingResponse {
+  notify_hour: number | null;
+  configured: boolean;
+}
+
+export interface UpdateNotificationTimeRequest {
+  notify_hour: number;
+}
+
+export interface UpdateFcmTokenRequest {
+  fcm_token: string;
 }

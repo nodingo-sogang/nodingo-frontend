@@ -52,8 +52,8 @@ export default function OnboardingPage() {
       userApi.postOnboarding({
         personas: [selectedPersona!],
         interest: {
-          macroKeywordId: selectedMacro!.id,
-          specificKeywordIds: selectedSpecific,
+          macro_keyword_id: selectedMacro!.id,
+          specific_keyword_ids: selectedSpecific,
         },
       }).catch(() => null), // 백엔드 없어도 진행
     onSettled: () => {
