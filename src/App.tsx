@@ -43,6 +43,8 @@ export default function App() {
             </OnboardingGuard>
           }
         />
+        {/* 개발용: 인증 없이 그래프 디자인 확인 */}
+        <Route path="/preview" element={<GraphPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
