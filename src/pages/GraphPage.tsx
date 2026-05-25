@@ -179,23 +179,32 @@ export default function GraphPage() {
       weight: e.weight,
     }));
 
+    // 노드 수에 따라 반발력 조정 (노드가 적을수록 약하게)
+    const chargeStrength = Math.max(-200, -20 * Math.sqrt(simNodes.length));
+
     const sim = forceSimulation<SimNode>(simNodes)
       .force(
         'link',
         forceLink<SimNode, SimLink>(simLinks)
           .id((d) => d.id)
-          .distance((l) => 110 + (1 - l.weight) * 60)
-          .strength(0.3),
+          .distance((l) => 80 + (1 - l.weight) * 40)
+          .strength(0.5),
       )
-      .force('charge', forceManyBody<SimNode>().strength(-80))
-      .force('center', forceCenter<SimNode>(SVG_W / 2, SVG_H / 2).strength(0.05))
-      .force('x', forceX<SimNode>(SVG_W / 2).strength(0.03))
-      .force('y', forceY<SimNode>(SVG_H / 2).strength(0.03))
-      .force('collide', forceCollide<SimNode>((d) => nodeRadius(d.score) + 6))
+      .force('charge', forceManyBody<SimNode>().strength(chargeStrength))
+      .force('center', forceCenter<SimNode>(SVG_W / 2, SVG_H / 2).strength(0.15))
+      .force('x', forceX<SimNode>(SVG_W / 2).strength(0.08))
+      .force('y', forceY<SimNode>(SVG_H / 2).strength(0.08))
+      .force('collide', forceCollide<SimNode>((d) => nodeRadius(d.score) + 8))
       .alphaDecay(0.025)
       .on('tick', () => {
+        // 노드가 SVG 영역을 벗어나지 않도록 클램핑
+        simNodesRef.current.forEach((n) => {
+          const r = nodeRadius(n.score) + 8;
+          n.x = Math.max(r, Math.min(SVG_W - r, n.x ?? SVG_W / 2));
+          n.y = Math.max(r, Math.min(SVG_H - r, n.y ?? SVG_H / 2));
+        });
         const map = new Map<number, { x: number; y: number }>();
-        simNodesRef.current.forEach((n) => map.set(n.id, { x: n.x ?? 0, y: n.y ?? 0 }));
+        simNodesRef.current.forEach((n) => map.set(n.id, { x: n.x!, y: n.y! }));
         setPositions(new Map(map));
       });
 
