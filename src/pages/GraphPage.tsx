@@ -424,12 +424,29 @@ export default function GraphPage() {
                 style={{ touchAction: 'none' }}
               >
                 <defs>
-                  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="4" result="blur" />
+                  {/* 큰 성운 글로우 (선택 시) */}
+                  <filter id="glow-lg" x="-150%" y="-150%" width="400%" height="400%">
+                    <feGaussianBlur stdDeviation="10" result="blur" />
                     <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
                   </filter>
-                  <filter id="glow-sm" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="2" result="blur" />
+                  {/* 기본 글로우 */}
+                  <filter id="glow" x="-100%" y="-100%" width="300%" height="300%">
+                    <feGaussianBlur stdDeviation="5" result="blur" />
+                    <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                  </filter>
+                  {/* 작은 글로우 */}
+                  <filter id="glow-sm" x="-80%" y="-80%" width="260%" height="260%">
+                    <feGaussianBlur stdDeviation="2.5" result="blur" />
+                    <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                  </filter>
+                  {/* 코어 화이트 글로우 */}
+                  <filter id="core-glow" x="-200%" y="-200%" width="500%" height="500%">
+                    <feGaussianBlur stdDeviation="1.2" result="blur" />
+                    <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                  </filter>
+                  {/* 엣지 글로우 */}
+                  <filter id="edge-glow" x="-20%" y="-200%" width="140%" height="500%">
+                    <feGaussianBlur stdDeviation="1.5" result="blur" />
                     <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
                   </filter>
                 </defs>
@@ -437,7 +454,7 @@ export default function GraphPage() {
                 <rect x="0" y="0" width={SVG_W} height={SVG_H} fill="transparent" onPointerDown={onBgPointerDown} />
 
                 <g transform={`translate(${transform.x},${transform.y}) scale(${transform.scale})`}>
-                  {/* Edges */}
+                  {/* Edges — 성좌선 */}
                   {allEdges.map((edge, i) => {
                     const src = positions.get(edge.source);
                     const tgt = positions.get(edge.target);
@@ -451,15 +468,16 @@ export default function GraphPage() {
                       <line
                         key={i}
                         x1={src.x} y1={src.y} x2={tgt.x} y2={tgt.y}
-                        stroke={edgeHighlighted ? '#ffffff' : 'var(--theme-text)'}
-                        strokeWidth={edgeHighlighted ? edge.weight * 2 : 0.6}
-                        strokeOpacity={edgeDimmed ? 0.04 : edgeHighlighted ? 0.55 : 0.18}
-                        style={{ transition: 'stroke-opacity 0.2s' }}
+                        stroke="#ffffff"
+                        strokeWidth={edgeHighlighted ? edge.weight * 1.5 : 0.5}
+                        strokeOpacity={edgeDimmed ? 0.03 : edgeHighlighted ? 0.45 : 0.1}
+                        filter={edgeHighlighted ? 'url(#edge-glow)' : undefined}
+                        style={{ transition: 'stroke-opacity 0.25s' }}
                       />
                     );
                   })}
 
-                  {/* Nodes */}
+                  {/* Nodes — 별 스타일 */}
                   {allNodes.map((node) => {
                     const p = positions.get(node.id);
                     if (!p) return null;
@@ -470,6 +488,16 @@ export default function GraphPage() {
                     const highlighted = isHighlighted(node.id);
                     const simNode = simNodesRef.current.find((s) => s.id === node.id)!;
 
+                    // 별의 각 레이어 크기
+                    const auraR = r * 3.2;       // 가장 바깥 성운 빛
+                    const glowR = r * 1.8;        // 중간 글로우
+                    const coreR = Math.max(2, r * 0.45);  // 밝은 코어
+                    // 십자 스파이크 길이
+                    const spikeL = r * 2.4;
+                    const spikeW = Math.max(0.4, r * 0.15);
+
+                    const baseOpacity = dimmed ? 0.08 : highlighted || isSelected ? 1 : 0.85;
+
                     return (
                       <g
                         key={node.id}
@@ -477,29 +505,93 @@ export default function GraphPage() {
                         onMouseEnter={() => setHoveredNodeId(node.id)}
                         onMouseLeave={() => setHoveredNodeId(null)}
                       >
+                        {/* 선택 시 큰 성운 링 */}
                         {isSelected && (
-                          <circle cx={p.x} cy={p.y} r={r + 6} fill={color} fillOpacity={0.2} filter="url(#glow)" />
+                          <circle
+                            cx={p.x} cy={p.y} r={auraR * 1.5}
+                            fill={color} fillOpacity={0.07}
+                            filter="url(#glow-lg)"
+                            style={{ pointerEvents: 'none' }}
+                          />
                         )}
-                        {(highlighted || isSelected) && (
-                          <circle cx={p.x} cy={p.y} r={r + 3} fill="none" stroke={color} strokeWidth={1} strokeOpacity={0.5} />
-                        )}
+
+                        {/* 가장 바깥 성운 아우라 */}
                         <circle
-                          cx={p.x} cy={p.y} r={r}
+                          cx={p.x} cy={p.y} r={auraR}
                           fill={color}
-                          fillOpacity={dimmed ? 0.12 : highlighted || isSelected ? 1 : 0.8}
-                          filter={highlighted || isSelected ? 'url(#glow-sm)' : undefined}
-                          style={{ transition: 'fill-opacity 0.2s', cursor: 'grab' }}
+                          fillOpacity={dimmed ? 0.04 : isSelected ? 0.18 : highlighted ? 0.14 : 0.08}
+                          filter="url(#glow)"
+                          style={{ transition: 'fill-opacity 0.25s', pointerEvents: 'none' }}
+                        />
+
+                        {/* 중간 글로우 레이어 */}
+                        <circle
+                          cx={p.x} cy={p.y} r={glowR}
+                          fill={color}
+                          fillOpacity={dimmed ? 0.08 : isSelected ? 0.35 : highlighted ? 0.28 : 0.18}
+                          filter="url(#glow-sm)"
+                          style={{ transition: 'fill-opacity 0.25s', pointerEvents: 'none' }}
+                        />
+
+                        {/* 십자 스파이크 (별빛 산란) */}
+                        {!dimmed && (
+                          <g opacity={highlighted || isSelected ? 0.7 : 0.35} style={{ pointerEvents: 'none' }}>
+                            {/* 수직 */}
+                            <line
+                              x1={p.x} y1={p.y - spikeL}
+                              x2={p.x} y2={p.y + spikeL}
+                              stroke={color} strokeWidth={spikeW}
+                              filter="url(#glow-sm)"
+                            />
+                            {/* 수평 */}
+                            <line
+                              x1={p.x - spikeL} y1={p.y}
+                              x2={p.x + spikeL} y2={p.y}
+                              stroke={color} strokeWidth={spikeW}
+                              filter="url(#glow-sm)"
+                            />
+                          </g>
+                        )}
+
+                        {/* 클릭 히트 영역 (투명, 넓게) */}
+                        <circle
+                          cx={p.x} cy={p.y} r={glowR}
+                          fill="transparent"
+                          style={{ cursor: 'grab' }}
                           onPointerDown={(e) => onNodePointerDown(e, simNode)}
                           onPointerUp={(e) => onNodePointerUp(e, node.id)}
                         />
+
+                        {/* 밝은 코어 */}
+                        <circle
+                          cx={p.x} cy={p.y} r={coreR}
+                          fill="#ffffff"
+                          fillOpacity={dimmed ? 0.1 : isSelected ? 1 : highlighted ? 0.95 : 0.88}
+                          filter="url(#core-glow)"
+                          style={{ transition: 'fill-opacity 0.25s', pointerEvents: 'none' }}
+                        />
+
+                        {/* 하이라이트 시 코어 색 링 */}
+                        {(highlighted || isSelected) && (
+                          <circle
+                            cx={p.x} cy={p.y} r={coreR + 1.5}
+                            fill="none"
+                            stroke={color} strokeWidth={1}
+                            strokeOpacity={0.8}
+                            style={{ pointerEvents: 'none' }}
+                          />
+                        )}
+
+                        {/* 라벨 */}
                         <text
-                          x={p.x} y={p.y + r + 11}
+                          x={p.x} y={p.y + auraR + 9}
                           textAnchor="middle"
-                          fontSize={10}
-                          fill="var(--theme-text)"
-                          fillOpacity={dimmed ? 0.2 : highlighted || isSelected ? 1 : 0.8}
-                          fontWeight={highlighted || isSelected ? '700' : '500'}
-                          style={{ userSelect: 'none', pointerEvents: 'none', transition: 'fill-opacity 0.2s' }}
+                          fontSize={highlighted || isSelected ? 11 : 9.5}
+                          fill={highlighted || isSelected ? '#ffffff' : 'rgba(255,255,255,0.7)'}
+                          fillOpacity={baseOpacity}
+                          fontWeight={highlighted || isSelected ? '600' : '400'}
+                          letterSpacing="0.3"
+                          style={{ userSelect: 'none', pointerEvents: 'none', transition: 'all 0.2s' }}
                         >
                           {node.label}
                         </text>
@@ -523,7 +615,7 @@ export default function GraphPage() {
                 ['사회', '#bf5af2'], ['문화', '#ff453a'], ['국제', '#64d2ff'],
               ].map(([label, color]) => (
                 <div key={label} className={styles.legendItem}>
-                  <span className={styles.legendDot} style={{ background: color }} />
+                  <span className={styles.legendDot} style={{ background: color, boxShadow: `0 0 5px 1px ${color}` }} />
                   <span>{label}</span>
                 </div>
               ))}
