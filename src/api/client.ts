@@ -57,7 +57,14 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // 처음부터 토큰이 없는 상태(비인증 접근)라면 리다이렉트 없이 에러 전파
+    // → /preview 같은 비인증 라우트에서 mock fallback이 동작할 수 있게
+    const accessToken = tokenStorage.getAccess();
     const refreshToken = tokenStorage.getRefresh();
+    if (!accessToken && !refreshToken) {
+      return Promise.reject(error);
+    }
+
     if (!refreshToken) {
       tokenStorage.clear();
       window.location.href = '/login';
