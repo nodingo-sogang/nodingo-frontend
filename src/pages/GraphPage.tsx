@@ -92,13 +92,13 @@ export default function GraphPage() {
   // 모든 탭의 그래프를 동시에 fetch
   const graphQueries = useQueries({
     queries: tabs.map((tab) => ({
-      queryKey: ['graph', tab.keywordId],
+      queryKey: ['graph', tab.keyword_id],
       queryFn: () =>
         graphApi
-          .getGraphData(tab.keywordId)
+          .getGraphData(tab.keyword_id)
           .then((r) => r.data.data)
-          .catch(() => MOCK_GRAPH[tab.keywordId] ?? MOCK_GRAPH[1]),
-      placeholderData: MOCK_GRAPH[tab.keywordId] ?? MOCK_GRAPH[1],
+          .catch(() => MOCK_GRAPH[tab.keyword_id] ?? MOCK_GRAPH[1]),
+      placeholderData: MOCK_GRAPH[tab.keyword_id] ?? MOCK_GRAPH[1],
     })),
   });
 
@@ -117,7 +117,7 @@ export default function GraphPage() {
 
       const ids = new Set<number>();
       data.nodes.forEach((n) => { nodeMap.set(n.id, n); ids.add(n.id); });
-      tabNodeIds.set(tab.keywordId, ids);
+      tabNodeIds.set(tab.keyword_id, ids);
 
       data.edges.forEach((e) => {
         const k = `${Math.min(e.source, e.target)}-${Math.max(e.source, e.target)}`;
@@ -179,23 +179,32 @@ export default function GraphPage() {
       weight: e.weight,
     }));
 
+    // 노드 수에 따라 반발력 조정 (노드가 적을수록 약하게)
+    const chargeStrength = Math.max(-200, -20 * Math.sqrt(simNodes.length));
+
     const sim = forceSimulation<SimNode>(simNodes)
       .force(
         'link',
         forceLink<SimNode, SimLink>(simLinks)
           .id((d) => d.id)
-          .distance((l) => 110 + (1 - l.weight) * 60)
-          .strength(0.3),
+          .distance((l) => 80 + (1 - l.weight) * 40)
+          .strength(0.5),
       )
-      .force('charge', forceManyBody<SimNode>().strength(-80))
-      .force('center', forceCenter<SimNode>(SVG_W / 2, SVG_H / 2).strength(0.05))
-      .force('x', forceX<SimNode>(SVG_W / 2).strength(0.03))
-      .force('y', forceY<SimNode>(SVG_H / 2).strength(0.03))
-      .force('collide', forceCollide<SimNode>((d) => nodeRadius(d.score) + 6))
+      .force('charge', forceManyBody<SimNode>().strength(chargeStrength))
+      .force('center', forceCenter<SimNode>(SVG_W / 2, SVG_H / 2).strength(0.15))
+      .force('x', forceX<SimNode>(SVG_W / 2).strength(0.08))
+      .force('y', forceY<SimNode>(SVG_H / 2).strength(0.08))
+      .force('collide', forceCollide<SimNode>((d) => nodeRadius(d.score) + 8))
       .alphaDecay(0.025)
       .on('tick', () => {
+        // 노드가 SVG 영역을 벗어나지 않도록 클램핑
+        simNodesRef.current.forEach((n) => {
+          const r = nodeRadius(n.score) + 8;
+          n.x = Math.max(r, Math.min(SVG_W - r, n.x ?? SVG_W / 2));
+          n.y = Math.max(r, Math.min(SVG_H - r, n.y ?? SVG_H / 2));
+        });
         const map = new Map<number, { x: number; y: number }>();
-        simNodesRef.current.forEach((n) => map.set(n.id, { x: n.x ?? 0, y: n.y ?? 0 }));
+        simNodesRef.current.forEach((n) => map.set(n.id, { x: n.x!, y: n.y! }));
         setPositions(new Map(map));
       });
 
@@ -378,12 +387,12 @@ export default function GraphPage() {
             ? Array.from({ length: 3 }).map((_, i) => <div key={i} className={styles.tabSkeleton} />)
             : tabs.map((tab) => (
                 <button
-                  key={tab.keywordId}
+                  key={tab.keyword_id}
                   className={[
                     styles.tab,
-                    highlightKeywordId === tab.keywordId ? styles.tabActive : '',
+                    highlightKeywordId === tab.keyword_id ? styles.tabActive : '',
                   ].filter(Boolean).join(' ')}
-                  onClick={() => setHighlightKeywordId((prev) => (prev === tab.keywordId ? null : tab.keywordId))}
+                  onClick={() => setHighlightKeywordId((prev) => (prev === tab.keyword_id ? null : tab.keyword_id))}
                 >
                   {tab.word}
                 </button>
@@ -415,12 +424,21 @@ export default function GraphPage() {
                 style={{ touchAction: 'none' }}
               >
                 <defs>
-                  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="4" result="blur" />
-                    <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                  {/* 노드 글로우: blur만 적용 → 자연스러운 그라디언트 페이드 */}
+                  <filter id="node-glow" x="-200%" y="-200%" width="500%" height="500%">
+                    <feGaussianBlur stdDeviation="7" />
                   </filter>
-                  <filter id="glow-sm" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="2" result="blur" />
+                  {/* 선택 시 추가 외곽 글로우 */}
+                  <filter id="node-glow-lg" x="-250%" y="-250%" width="600%" height="600%">
+                    <feGaussianBlur stdDeviation="12" />
+                  </filter>
+                  {/* 코어 흰 점 */}
+                  <filter id="core-glow" x="-300%" y="-300%" width="700%" height="700%">
+                    <feGaussianBlur stdDeviation="1.5" />
+                  </filter>
+                  {/* 하이라이트 엣지 */}
+                  <filter id="edge-glow" x="-20%" y="-300%" width="140%" height="700%">
+                    <feGaussianBlur stdDeviation="1.2" result="blur" />
                     <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
                   </filter>
                 </defs>
@@ -428,7 +446,7 @@ export default function GraphPage() {
                 <rect x="0" y="0" width={SVG_W} height={SVG_H} fill="transparent" onPointerDown={onBgPointerDown} />
 
                 <g transform={`translate(${transform.x},${transform.y}) scale(${transform.scale})`}>
-                  {/* Edges */}
+                  {/* Edges — 성좌선 */}
                   {allEdges.map((edge, i) => {
                     const src = positions.get(edge.source);
                     const tgt = positions.get(edge.target);
@@ -442,10 +460,11 @@ export default function GraphPage() {
                       <line
                         key={i}
                         x1={src.x} y1={src.y} x2={tgt.x} y2={tgt.y}
-                        stroke={edgeHighlighted ? '#ffffff' : 'var(--theme-text)'}
-                        strokeWidth={edgeHighlighted ? edge.weight * 2 : 0.6}
-                        strokeOpacity={edgeDimmed ? 0.04 : edgeHighlighted ? 0.55 : 0.18}
-                        style={{ transition: 'stroke-opacity 0.2s' }}
+                        stroke="#ffffff"
+                        strokeWidth={edgeHighlighted ? edge.weight * 1.5 : 0.5}
+                        strokeOpacity={edgeDimmed ? 0.03 : edgeHighlighted ? 0.45 : 0.1}
+                        filter={edgeHighlighted ? 'url(#edge-glow)' : undefined}
+                        style={{ transition: 'stroke-opacity 0.25s' }}
                       />
                     );
                   })}
@@ -459,41 +478,74 @@ export default function GraphPage() {
                     const isSelected = node.id === selectedNodeId;
                     const dimmed = isDimmed(node.id);
                     const highlighted = isHighlighted(node.id);
+                    const hovered = hoveredNodeId === node.id;
                     const simNode = simNodesRef.current.find((s) => s.id === node.id)!;
 
+                    // 글로우 원 반지름 (blur로 자연스럽게 페이드)
+                    const glowR = r * 1.6;
+                    const coreR = Math.max(1, r * 0.2);
+                    // 히트 영역
+                    const hitR = Math.max(14, glowR);
+
                     return (
-                      <g
-                        key={node.id}
-                        style={{ cursor: 'grab' }}
+                      <g key={node.id}
                         onMouseEnter={() => setHoveredNodeId(node.id)}
                         onMouseLeave={() => setHoveredNodeId(null)}
                       >
+                        {/* 선택 시 외곽 후광 */}
                         {isSelected && (
-                          <circle cx={p.x} cy={p.y} r={r + 6} fill={color} fillOpacity={0.2} filter="url(#glow)" />
+                          <circle cx={p.x} cy={p.y} r={glowR * 1.8}
+                            fill={color} fillOpacity={0.25}
+                            filter="url(#node-glow-lg)"
+                            style={{ pointerEvents: 'none' }}
+                          />
                         )}
-                        {(highlighted || isSelected) && (
-                          <circle cx={p.x} cy={p.y} r={r + 3} fill="none" stroke={color} strokeWidth={1} strokeOpacity={0.5} />
-                        )}
-                        <circle
-                          cx={p.x} cy={p.y} r={r}
+
+                        {/* 메인 글로우 — blur 처리된 원 하나 → 중심에서 투명하게 퍼짐 */}
+                        <circle cx={p.x} cy={p.y} r={glowR}
                           fill={color}
-                          fillOpacity={dimmed ? 0.12 : highlighted || isSelected ? 1 : 0.8}
-                          filter={highlighted || isSelected ? 'url(#glow-sm)' : undefined}
-                          style={{ transition: 'fill-opacity 0.2s', cursor: 'grab' }}
+                          fillOpacity={
+                            dimmed        ? 0.06
+                            : isSelected  ? 0.9
+                            : highlighted ? 0.75
+                            : hovered     ? 0.65
+                            :               0.5
+                          }
+                          filter="url(#node-glow)"
+                          style={{ transition: 'fill-opacity 0.2s', pointerEvents: 'none' }}
+                        />
+
+                        {/* 히트 영역 (투명, 넓게) */}
+                        <circle cx={p.x} cy={p.y} r={hitR}
+                          fill="transparent"
+                          style={{ cursor: 'grab' }}
                           onPointerDown={(e) => onNodePointerDown(e, simNode)}
                           onPointerUp={(e) => onNodePointerUp(e, node.id)}
                         />
-                        <text
-                          x={p.x} y={p.y + r + 11}
-                          textAnchor="middle"
-                          fontSize={10}
-                          fill="var(--theme-text)"
-                          fillOpacity={dimmed ? 0.2 : highlighted || isSelected ? 1 : 0.8}
-                          fontWeight={highlighted || isSelected ? '700' : '500'}
-                          style={{ userSelect: 'none', pointerEvents: 'none', transition: 'fill-opacity 0.2s' }}
-                        >
-                          {node.label}
-                        </text>
+
+                        {/* 밝은 흰 코어 점 */}
+                        <circle cx={p.x} cy={p.y} r={coreR}
+                          fill="#ffffff"
+                          fillOpacity={dimmed ? 0.15 : 1}
+                          filter="url(#core-glow)"
+                          style={{ transition: 'fill-opacity 0.2s', pointerEvents: 'none' }}
+                        />
+
+                        {/* 라벨 — 호버된 노드 + 인접 노드 + 선택된 노드에만 표시 */}
+                        {(isSelected || (hoverAdjacentIds !== null && hoverAdjacentIds.has(node.id))) && (
+                          <text
+                            x={p.x} y={p.y + glowR + 13}
+                            textAnchor="middle"
+                            fontSize={11}
+                            fill="#ffffff"
+                            fillOpacity={isSelected ? 1 : 0.9}
+                            fontWeight="500"
+                            letterSpacing="0.2"
+                            style={{ userSelect: 'none', pointerEvents: 'none' }}
+                          >
+                            {node.label}
+                          </text>
+                        )}
                       </g>
                     );
                   })}
@@ -514,7 +566,7 @@ export default function GraphPage() {
                 ['사회', '#bf5af2'], ['문화', '#ff453a'], ['국제', '#64d2ff'],
               ].map(([label, color]) => (
                 <div key={label} className={styles.legendItem}>
-                  <span className={styles.legendDot} style={{ background: color }} />
+                  <span className={styles.legendDot} style={{ background: color, boxShadow: `0 0 5px 1px ${color}` }} />
                   <span>{label}</span>
                 </div>
               ))}
