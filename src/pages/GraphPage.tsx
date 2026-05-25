@@ -531,8 +531,8 @@ export default function GraphPage() {
                           style={{ transition: 'fill-opacity 0.2s', pointerEvents: 'none' }}
                         />
 
-                        {/* 라벨 — 호버/선택 시에만 표시 */}
-                        {(hovered || isSelected) && (
+                        {/* 라벨 — 호버된 노드 + 인접 노드 + 선택된 노드에만 표시 */}
+                        {(isSelected || (hoverAdjacentIds !== null && hoverAdjacentIds.has(node.id))) && (
                           <text
                             x={p.x} y={p.y + glowR + 13}
                             textAnchor="middle"
