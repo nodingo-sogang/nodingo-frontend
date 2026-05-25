@@ -424,29 +424,21 @@ export default function GraphPage() {
                 style={{ touchAction: 'none' }}
               >
                 <defs>
-                  {/* 큰 성운 글로우 (선택 시) */}
-                  <filter id="glow-lg" x="-150%" y="-150%" width="400%" height="400%">
-                    <feGaussianBlur stdDeviation="10" result="blur" />
-                    <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                  {/* 노드 글로우: blur만 적용 → 자연스러운 그라디언트 페이드 */}
+                  <filter id="node-glow" x="-200%" y="-200%" width="500%" height="500%">
+                    <feGaussianBlur stdDeviation="7" />
                   </filter>
-                  {/* 기본 글로우 */}
-                  <filter id="glow" x="-100%" y="-100%" width="300%" height="300%">
-                    <feGaussianBlur stdDeviation="5" result="blur" />
-                    <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                  {/* 선택 시 추가 외곽 글로우 */}
+                  <filter id="node-glow-lg" x="-250%" y="-250%" width="600%" height="600%">
+                    <feGaussianBlur stdDeviation="12" />
                   </filter>
-                  {/* 작은 글로우 */}
-                  <filter id="glow-sm" x="-80%" y="-80%" width="260%" height="260%">
-                    <feGaussianBlur stdDeviation="2.5" result="blur" />
-                    <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                  {/* 코어 흰 점 */}
+                  <filter id="core-glow" x="-300%" y="-300%" width="700%" height="700%">
+                    <feGaussianBlur stdDeviation="1.5" />
                   </filter>
-                  {/* 코어 화이트 글로우 */}
-                  <filter id="core-glow" x="-200%" y="-200%" width="500%" height="500%">
+                  {/* 하이라이트 엣지 */}
+                  <filter id="edge-glow" x="-20%" y="-300%" width="140%" height="700%">
                     <feGaussianBlur stdDeviation="1.2" result="blur" />
-                    <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-                  </filter>
-                  {/* 엣지 글로우 */}
-                  <filter id="edge-glow" x="-20%" y="-200%" width="140%" height="500%">
-                    <feGaussianBlur stdDeviation="1.5" result="blur" />
                     <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
                   </filter>
                 </defs>
@@ -477,7 +469,7 @@ export default function GraphPage() {
                     );
                   })}
 
-                  {/* Nodes — 별 스타일 */}
+                  {/* Nodes */}
                   {allNodes.map((node) => {
                     const p = positions.get(node.id);
                     if (!p) return null;
@@ -486,115 +478,74 @@ export default function GraphPage() {
                     const isSelected = node.id === selectedNodeId;
                     const dimmed = isDimmed(node.id);
                     const highlighted = isHighlighted(node.id);
+                    const hovered = hoveredNodeId === node.id;
                     const simNode = simNodesRef.current.find((s) => s.id === node.id)!;
 
-                    // 별의 각 레이어 크기
-                    const auraR = r * 3.2;       // 가장 바깥 성운 빛
-                    const glowR = r * 1.8;        // 중간 글로우
-                    const coreR = Math.max(2, r * 0.45);  // 밝은 코어
-                    // 십자 스파이크 길이
-                    const spikeL = r * 2.4;
-                    const spikeW = Math.max(0.4, r * 0.15);
-
-                    const baseOpacity = dimmed ? 0.08 : highlighted || isSelected ? 1 : 0.85;
+                    // 글로우 원 반지름 (blur로 자연스럽게 페이드)
+                    const glowR = r * 1.6;
+                    const coreR = Math.max(1.5, r * 0.38);
+                    // 히트 영역
+                    const hitR = Math.max(14, glowR);
 
                     return (
-                      <g
-                        key={node.id}
-                        style={{ cursor: 'grab' }}
+                      <g key={node.id}
                         onMouseEnter={() => setHoveredNodeId(node.id)}
                         onMouseLeave={() => setHoveredNodeId(null)}
                       >
-                        {/* 선택 시 큰 성운 링 */}
+                        {/* 선택 시 외곽 후광 */}
                         {isSelected && (
-                          <circle
-                            cx={p.x} cy={p.y} r={auraR * 1.5}
-                            fill={color} fillOpacity={0.07}
-                            filter="url(#glow-lg)"
+                          <circle cx={p.x} cy={p.y} r={glowR * 1.8}
+                            fill={color} fillOpacity={0.25}
+                            filter="url(#node-glow-lg)"
                             style={{ pointerEvents: 'none' }}
                           />
                         )}
 
-                        {/* 가장 바깥 성운 아우라 */}
-                        <circle
-                          cx={p.x} cy={p.y} r={auraR}
+                        {/* 메인 글로우 — blur 처리된 원 하나 → 중심에서 투명하게 퍼짐 */}
+                        <circle cx={p.x} cy={p.y} r={glowR}
                           fill={color}
-                          fillOpacity={dimmed ? 0.04 : isSelected ? 0.18 : highlighted ? 0.14 : 0.08}
-                          filter="url(#glow)"
-                          style={{ transition: 'fill-opacity 0.25s', pointerEvents: 'none' }}
+                          fillOpacity={
+                            dimmed        ? 0.06
+                            : isSelected  ? 0.9
+                            : highlighted ? 0.75
+                            : hovered     ? 0.65
+                            :               0.5
+                          }
+                          filter="url(#node-glow)"
+                          style={{ transition: 'fill-opacity 0.2s', pointerEvents: 'none' }}
                         />
 
-                        {/* 중간 글로우 레이어 */}
-                        <circle
-                          cx={p.x} cy={p.y} r={glowR}
-                          fill={color}
-                          fillOpacity={dimmed ? 0.08 : isSelected ? 0.35 : highlighted ? 0.28 : 0.18}
-                          filter="url(#glow-sm)"
-                          style={{ transition: 'fill-opacity 0.25s', pointerEvents: 'none' }}
-                        />
-
-                        {/* 십자 스파이크 (별빛 산란) */}
-                        {!dimmed && (
-                          <g opacity={highlighted || isSelected ? 0.7 : 0.35} style={{ pointerEvents: 'none' }}>
-                            {/* 수직 */}
-                            <line
-                              x1={p.x} y1={p.y - spikeL}
-                              x2={p.x} y2={p.y + spikeL}
-                              stroke={color} strokeWidth={spikeW}
-                              filter="url(#glow-sm)"
-                            />
-                            {/* 수평 */}
-                            <line
-                              x1={p.x - spikeL} y1={p.y}
-                              x2={p.x + spikeL} y2={p.y}
-                              stroke={color} strokeWidth={spikeW}
-                              filter="url(#glow-sm)"
-                            />
-                          </g>
-                        )}
-
-                        {/* 클릭 히트 영역 (투명, 넓게) */}
-                        <circle
-                          cx={p.x} cy={p.y} r={glowR}
+                        {/* 히트 영역 (투명, 넓게) */}
+                        <circle cx={p.x} cy={p.y} r={hitR}
                           fill="transparent"
                           style={{ cursor: 'grab' }}
                           onPointerDown={(e) => onNodePointerDown(e, simNode)}
                           onPointerUp={(e) => onNodePointerUp(e, node.id)}
                         />
 
-                        {/* 밝은 코어 */}
-                        <circle
-                          cx={p.x} cy={p.y} r={coreR}
+                        {/* 밝은 흰 코어 점 */}
+                        <circle cx={p.x} cy={p.y} r={coreR}
                           fill="#ffffff"
-                          fillOpacity={dimmed ? 0.1 : isSelected ? 1 : highlighted ? 0.95 : 0.88}
+                          fillOpacity={dimmed ? 0.15 : 1}
                           filter="url(#core-glow)"
-                          style={{ transition: 'fill-opacity 0.25s', pointerEvents: 'none' }}
+                          style={{ transition: 'fill-opacity 0.2s', pointerEvents: 'none' }}
                         />
 
-                        {/* 하이라이트 시 코어 색 링 */}
-                        {(highlighted || isSelected) && (
-                          <circle
-                            cx={p.x} cy={p.y} r={coreR + 1.5}
-                            fill="none"
-                            stroke={color} strokeWidth={1}
-                            strokeOpacity={0.8}
-                            style={{ pointerEvents: 'none' }}
-                          />
+                        {/* 라벨 — 호버/선택 시에만 표시 */}
+                        {(hovered || isSelected) && (
+                          <text
+                            x={p.x} y={p.y + glowR + 13}
+                            textAnchor="middle"
+                            fontSize={11}
+                            fill="#ffffff"
+                            fillOpacity={isSelected ? 1 : 0.9}
+                            fontWeight="500"
+                            letterSpacing="0.2"
+                            style={{ userSelect: 'none', pointerEvents: 'none' }}
+                          >
+                            {node.label}
+                          </text>
                         )}
-
-                        {/* 라벨 */}
-                        <text
-                          x={p.x} y={p.y + auraR + 9}
-                          textAnchor="middle"
-                          fontSize={highlighted || isSelected ? 11 : 9.5}
-                          fill={highlighted || isSelected ? '#ffffff' : 'rgba(255,255,255,0.7)'}
-                          fillOpacity={baseOpacity}
-                          fontWeight={highlighted || isSelected ? '600' : '400'}
-                          letterSpacing="0.3"
-                          style={{ userSelect: 'none', pointerEvents: 'none', transition: 'all 0.2s' }}
-                        >
-                          {node.label}
-                        </text>
                       </g>
                     );
                   })}
