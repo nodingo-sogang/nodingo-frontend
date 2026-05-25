@@ -483,7 +483,7 @@ export default function GraphPage() {
 
                     // 글로우 원 반지름 (blur로 자연스럽게 페이드)
                     const glowR = r * 1.6;
-                    const coreR = Math.max(1.5, r * 0.38);
+                    const coreR = Math.max(1, r * 0.2);
                     // 히트 영역
                     const hitR = Math.max(14, glowR);
 
