@@ -454,16 +454,72 @@ export const MOCK_PERSONAS: PersonaListResponse = {
   ],
 };
 
-export const MOCK_MACRO: KeywordListResponse = {
-  contents: [
-    { id: 1001, word: '통화정책' },
-    { id: 1002, word: '주식시장' },
-    { id: 1003, word: '부동산' },
-    { id: 1004, word: '무역' },
-    { id: 1005, word: '반도체' },
-    { id: 1006, word: '에너지' },
-  ],
+// 페르소나별 매크로 키워드 목업
+export const MOCK_MACRO_BY_PERSONA: Record<string, KeywordListResponse> = {
+  ECONOMY: {
+    contents: [
+      { id: 1001, word: '통화정책' },
+      { id: 1002, word: '주식시장' },
+      { id: 1003, word: '부동산' },
+      { id: 1004, word: '무역' },
+      { id: 1005, word: '반도체' },
+      { id: 1006, word: '에너지' },
+    ],
+  },
+  POLITICS: {
+    contents: [
+      { id: 1011, word: '대선' },
+      { id: 1012, word: '국회' },
+      { id: 1013, word: '탄핵' },
+      { id: 1014, word: '외교' },
+      { id: 1015, word: '복지정책' },
+      { id: 1016, word: '선거법' },
+    ],
+  },
+  TECHNOLOGY: {
+    contents: [
+      { id: 1021, word: 'AI 규제' },
+      { id: 1022, word: '반도체' },
+      { id: 1023, word: '빅테크' },
+      { id: 1024, word: '사이버보안' },
+      { id: 1025, word: '우주개발' },
+      { id: 1026, word: '전기차' },
+    ],
+  },
+  SOCIETY: {
+    contents: [
+      { id: 1031, word: '저출생' },
+      { id: 1032, word: '의료개혁' },
+      { id: 1033, word: '교육' },
+      { id: 1034, word: '일자리' },
+      { id: 1035, word: '주거' },
+      { id: 1036, word: '청년' },
+    ],
+  },
+  CULTURE: {
+    contents: [
+      { id: 1041, word: 'K-콘텐츠' },
+      { id: 1042, word: '스포츠' },
+      { id: 1043, word: '영화' },
+      { id: 1044, word: '음악' },
+      { id: 1045, word: '게임' },
+      { id: 1046, word: '미술' },
+    ],
+  },
+  INTERNATIONAL: {
+    contents: [
+      { id: 1051, word: '미중관계' },
+      { id: 1052, word: '한미동맹' },
+      { id: 1053, word: '우크라이나' },
+      { id: 1054, word: '중동' },
+      { id: 1055, word: '관세전쟁' },
+      { id: 1056, word: '기후협약' },
+    ],
+  },
 };
+
+// 기본값 (페르소나 매칭 실패 시)
+export const MOCK_MACRO: KeywordListResponse = MOCK_MACRO_BY_PERSONA.ECONOMY;
 
 export const MOCK_SPECIFIC: KeywordListResponse = {
   contents: [

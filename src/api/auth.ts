@@ -9,7 +9,7 @@ export const authApi = {
     apiClient.post<ApiResponse<void>>('/api/auth/logout'),
 
   naverLoginUrl: () => {
-    const base = import.meta.env.VITE_API_BASE_URL ?? '';
+    const base = import.meta.env.VITE_BACKEND_URL ?? '';
     return `${base}/oauth2/authorization/naver`;
   },
 };
