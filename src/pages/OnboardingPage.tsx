@@ -5,7 +5,7 @@ import { userApi } from '../api/user';
 import { useAuthStore } from '../store/authStore';
 import type { UserPersona, KeywordResponse } from '../types';
 import { PERSONA_LABEL } from '../types';
-import { MOCK_PERSONAS, MOCK_MACRO, MOCK_SPECIFIC } from '../mocks';
+import { MOCK_PERSONAS, MOCK_MACRO, MOCK_MACRO_BY_PERSONA, MOCK_SPECIFIC } from '../mocks';
 import styles from './OnboardingPage.module.css';
 
 type Step = 'persona' | 'macro' | 'specific' | 'loading';
@@ -31,18 +31,29 @@ export default function OnboardingPage() {
     placeholderData: MOCK_PERSONAS,
   });
 
+  const personaMock = selectedPersona
+    ? (MOCK_MACRO_BY_PERSONA[selectedPersona] ?? MOCK_MACRO)
+    : MOCK_MACRO;
+
   const { data: macroData, isFetching: macroFetching } = useQuery({
     queryKey: ['macroKeywords', selectedPersona],
     queryFn: () =>
-      userApi.getMacroKeywords(selectedPersona!).then((r) => r.data.data).catch(() => MOCK_MACRO),
+      userApi.getMacroKeywords(selectedPersona!).then((r) => {
+        const d = r.data.data;
+        // API가 빈 결과를 리턴하면 페르소나별 mock으로 폴백
+        return d?.contents?.length ? d : personaMock;
+      }).catch(() => personaMock),
     enabled: !!selectedPersona && step === 'macro',
-    placeholderData: MOCK_MACRO,
+    placeholderData: personaMock,
   });
 
   const { data: specificData, isFetching: specificFetching } = useQuery({
     queryKey: ['specificKeywords', selectedMacro?.id],
     queryFn: () =>
-      userApi.getSpecificKeywords(selectedMacro!.id).then((r) => r.data.data).catch(() => MOCK_SPECIFIC),
+      userApi.getSpecificKeywords(selectedMacro!.id).then((r) => {
+        const d = r.data.data;
+        return d?.contents?.length ? d : MOCK_SPECIFIC;
+      }).catch(() => MOCK_SPECIFIC),
     enabled: !!selectedMacro && step === 'specific',
     placeholderData: MOCK_SPECIFIC,
   });

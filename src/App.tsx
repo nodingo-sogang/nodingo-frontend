@@ -25,6 +25,8 @@ export default function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/auth/callback" element={<OAuthCallbackPage />} />
+        <Route path="/auth/callback.html" element={<OAuthCallbackPage />} />
+        <Route path="/callback.html" element={<OAuthCallbackPage />} />
         <Route
           path="/onboarding"
           element={

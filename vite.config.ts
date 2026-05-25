@@ -7,21 +7,10 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: 'https://nodingo-core.ddns.net',
         changeOrigin: true,
       },
-      '/oauth2': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-      },
-      '/login': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-      },
-      '/auth': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-      },
+      // /oauth2, /login, /auth/callback 은 직접 URL 또는 React 라우트이므로 프록시 제외
     },
   },
 })
