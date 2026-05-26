@@ -58,6 +58,7 @@ export default function GraphPage() {
   const [hoveredNodeId, setHoveredNodeId] = useState<number | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [scrappedNodes, setScrappedNodes] = useState<Map<number, ScrappedNode>>(new Map());
+  const [isLiveData, setIsLiveData] = useState(false);
 
   // Pan/zoom
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
@@ -83,7 +84,14 @@ export default function GraphPage() {
 
   const { data: tabsData, isLoading: tabsLoading } = useQuery({
     queryKey: ['tabs'],
-    queryFn: () => graphApi.getTabs().then((r) => r.data.data).catch(() => MOCK_TABS),
+    queryFn: () =>
+      graphApi.getTabs().then((r) => {
+        setIsLiveData(true);
+        return r.data.data;
+      }).catch(() => {
+        setIsLiveData(false);
+        return MOCK_TABS;
+      }),
     placeholderData: MOCK_TABS,
   });
 
@@ -364,6 +372,9 @@ export default function GraphPage() {
           <span>Nodingo</span>
         </div>
         <div className={styles.topBarActions}>
+          <span className={isLiveData ? styles.badgeLive : styles.badgeMock}>
+            {isLiveData ? 'LIVE' : 'MOCK'}
+          </span>
           <button className={styles.themeToggle} onClick={toggleTheme} title={theme === 'dark' ? '라이트 모드' : '다크 모드'}>
             {theme === 'dark' ? (
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">

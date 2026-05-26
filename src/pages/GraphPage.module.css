@@ -50,6 +50,27 @@
   color: var(--theme-text);
 }
 
+.badgeLive,
+.badgeMock {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+}
+
+.badgeLive {
+  background-color: rgba(48, 209, 88, 0.15);
+  color: #30d158;
+  border: 1px solid rgba(48, 209, 88, 0.3);
+}
+
+.badgeMock {
+  background-color: rgba(255, 159, 10, 0.15);
+  color: #ff9f0a;
+  border: 1px solid rgba(255, 159, 10, 0.3);
+}
+
 .logoutBtn {
   font-size: 13px;
   color: var(--theme-text-muted);
