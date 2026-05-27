@@ -13,13 +13,150 @@ html {
 }
 
 body {
-  font-family: var(--font-family);
+  font-family: Pretendard, -apple-system, system-ui, sans-serif;
   color: var(--color-ink);
-  background-color: var(--color-canvas);
+  background: #FFFFFF;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+}
+
+@keyframes nodingo-sheet-in {
+  0%   { transform: translateY(40px); }
+  65%  { transform: translateY(-6px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes nodingo-pulse {
+  0%   { transform: scale(1); opacity: 0.65; }
+  70%  { transform: scale(1.45); opacity: 0; }
+  100% { transform: scale(1.45); opacity: 0; }
+}
+
+@keyframes nodingo-toast {
+  0%   { opacity: 0; transform: translate(-50%, 14px); }
+  100% { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@keyframes nodingo-modal-in {
+  0%   { opacity: 0; transform: translateY(28px) scale(0.97); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes nodingo-receipt-in {
+  0%   { opacity: 0; transform: translateY(120%); }
+  60%  { opacity: 1; transform: translateY(-6%); }
+  80%  { transform: translateY(2%); }
+  100% { transform: translateY(0); }
+}
+
+.nodingo-pulse {
+  animation: nodingo-pulse 1.8s ease-out infinite;
+}
+
+.nodingo-stage {
+  min-height: 100dvh;
+  background: #EFEEEA;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  overflow: hidden;
+}
+
+.nodingo-device {
+  --nodingo-status-offset: 47px;
+  width: 390px;
+  height: 812px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 32px);
+  border-radius: 48px;
+  overflow: hidden;
+  position: relative;
+  background: #FFFFFF;
+  box-shadow: 0 40px 80px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.12);
+}
+
+.nodingo-dynamic-island {
+  position: absolute;
+  top: 11px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 126px;
+  height: 37px;
+  border-radius: 24px;
+  background: #000000;
+  z-index: 120;
+  pointer-events: none;
+}
+
+.nodingo-statusbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 110;
+  height: 47px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 25px 0;
+  color: #000000;
+  font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-size: 17px;
+  font-weight: 590;
+  pointer-events: none;
+}
+
+.nodingo-system-icons {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.nodingo-home-indicator {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 120;
+  height: 34px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  padding-bottom: 8px;
+  pointer-events: none;
+}
+
+.nodingo-home-indicator::before {
+  content: '';
+  width: 139px;
+  height: 5px;
+  border-radius: 100px;
+  background: rgba(0,0,0,0.25);
+}
+
+@media (max-width: 430px), (max-height: 760px) {
+  .nodingo-stage {
+    padding: 0;
+    background: #FFFFFF;
+  }
+
+  .nodingo-device {
+    --nodingo-status-offset: 0px;
+    width: 100vw;
+    height: 100dvh;
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .nodingo-dynamic-island,
+  .nodingo-statusbar {
+    display: none;
+  }
 }
 
 a {
