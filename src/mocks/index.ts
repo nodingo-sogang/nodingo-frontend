@@ -5,6 +5,7 @@ import type {
   PersonaListResponse,
   KeywordListResponse,
 } from '../types';
+import type { Tier, Badge, UserGame, RankingEntry } from '../types/game';
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 
@@ -207,9 +208,9 @@ export const MOCK_SUMMARIES: Record<number, NodeSummaryResponse> = {
     keyword_id: 101, word: '금리', persona: 'ECONOMY',
     summary: '한국은행 금통위가 기준금리를 연 3.5%로 동결했습니다. 고물가·경기 둔화 우려 속에서 인하 시점에 대한 시장 기대가 높아지고 있으며, Fed의 통화정책 방향이 국내 금리 결정에 핵심 변수로 작용하고 있습니다.',
     news: [
-      { id: 9001, title: '한은, 기준금리 3.5% 동결…"물가 목표 수렴 전까지 신중"' },
-      { id: 9002, title: 'Fed 금리 동결에 원/달러 환율 1,360원대 유지' },
-      { id: 9003, title: '시장 "연내 금리 인하 2회" 전망 유지…빅스텝 가능성은 낮아' },
+      { id: 9001, title: '한은, 기준금리 3.5% 동결…"물가 목표 수렴 전까지 신중"', outlet: 'Nodingo News', date: '2025.05.20', url: 'https://example.com/news/9001', snippet: '금통위는 물가가 목표 수준에 안정적으로 수렴하기 전까지 통화정책을 신중하게 운용하겠다고 밝혔다.' },
+      { id: 9002, title: 'Fed 금리 동결에 원/달러 환율 1,360원대 유지', outlet: 'Market Brief', date: '2025.05.21', url: 'https://example.com/news/9002', snippet: '미국 금리 인하 지연 가능성이 커지며 원/달러 환율은 1,360원대에서 등락했다.' },
+      { id: 9003, title: '시장 "연내 금리 인하 2회" 전망 유지…빅스텝 가능성은 낮아', outlet: 'Economy Daily', date: '2025.05.22', url: 'https://example.com/news/9003', snippet: '시장 참가자들은 경기 둔화와 물가 흐름을 근거로 연내 완만한 인하 가능성을 보고 있다.' },
     ],
   },
   102: {
@@ -257,9 +258,9 @@ export const MOCK_SUMMARIES: Record<number, NodeSummaryResponse> = {
     keyword_id: 201, word: 'AI 규제', persona: 'TECHNOLOGY',
     summary: 'EU AI Act 시행을 계기로 글로벌 AI 규제 논의가 본격화됐습니다. 국내에서도 생성형 AI 법제화 논의가 진행 중이며, 딥페이크·허위정보 확산을 막기 위한 정책 대응 필요성이 부각되고 있습니다.',
     news: [
-      { id: 9010, title: 'EU AI Act 본격 시행…고위험 AI 시스템에 엄격한 규제 적용' },
-      { id: 9011, title: '국내 AI기본법 국회 통과 임박…산업계 "규제 완화" 촉구' },
-      { id: 9012, title: 'OpenAI·구글, EU 규정 대응에 연 수천억 투입 예정' },
+      { id: 9010, title: 'EU AI Act 본격 시행…고위험 AI 시스템에 엄격한 규제 적용', outlet: 'AI Policy', date: '2025.05.18', url: 'https://example.com/news/9010', snippet: 'EU AI Act는 고위험 AI 시스템에 대해 투명성, 안전성, 사후 관리 의무를 요구한다.' },
+      { id: 9011, title: '국내 AI기본법 국회 통과 임박…산업계 "규제 완화" 촉구', outlet: 'Tech Law', date: '2025.05.19', url: 'https://example.com/news/9011', snippet: '국내 AI기본법 논의에서는 산업 육성과 이용자 보호 사이의 균형이 핵심 쟁점으로 떠올랐다.' },
+      { id: 9012, title: 'OpenAI·구글, EU 규정 대응에 연 수천억 투입 예정', outlet: 'Global Tech', date: '2025.05.20', url: 'https://example.com/news/9012', snippet: '글로벌 AI 기업들은 EU 시장 대응을 위해 컴플라이언스 조직과 모델 관리 체계를 강화하고 있다.' },
     ],
   },
   202: {
@@ -299,9 +300,9 @@ export const MOCK_SUMMARIES: Record<number, NodeSummaryResponse> = {
     keyword_id: 301, word: '대선', persona: 'POLITICS',
     summary: '2027년 대통령 선거를 앞두고 여야 잠재 후보군 윤곽이 드러나고 있습니다. 경제 민생 이슈가 핵심 공약 경쟁의 중심이 되고 있으며, 여론조사 결과에 따라 후보 단일화 논의도 가시화되고 있습니다.',
     news: [
-      { id: 9020, title: '여야 대선 후보군 본격 가동…경선 일정 윤곽' },
-      { id: 9021, title: '"민생 경제" vs "안보 외교"…대선 핵심 의제 갈림길' },
-      { id: 9022, title: '여론조사 기관별 편차 커져…"표본·방법론 공개해야"' },
+      { id: 9020, title: '여야 대선 후보군 본격 가동…경선 일정 윤곽', outlet: 'Politics Now', date: '2025.05.16', url: 'https://example.com/news/9020', snippet: '여야는 경선 일정을 조율하며 잠재 후보군의 정책 행보를 본격화하고 있다.' },
+      { id: 9021, title: '"민생 경제" vs "안보 외교"…대선 핵심 의제 갈림길', outlet: 'Public Agenda', date: '2025.05.17', url: 'https://example.com/news/9021', snippet: '대선 의제는 경제 민생, 안보 외교, 청년 주거 정책을 중심으로 재편되고 있다.' },
+      { id: 9022, title: '여론조사 기관별 편차 커져…"표본·방법론 공개해야"', outlet: 'Election Lab', date: '2025.05.18', url: 'https://example.com/news/9022', snippet: '전문가들은 조사 방식과 표본 설계 차이가 후보 지지율 편차를 키우고 있다고 지적했다.' },
     ],
   },
   302: {
@@ -531,3 +532,138 @@ export const MOCK_SPECIFIC: KeywordListResponse = {
     { id: 2006, word: '물가지수' },
   ],
 };
+
+// ── 티어 정의 ──────────────────────────────────────────
+export const TIERS: Tier[] = [
+  { min:1,  max:3,  name:'새내기',          color:'#5BBA6F', soft:'#E5F4E0', characterImage:'/assets/characters/tier1_새내기.png' },
+  { min:4,  max:7,  name:'시사 입문러',     color:'#4FA3E0', soft:'#E1F0FA', characterImage:'/assets/characters/tier2_시사입문러.png' },
+  { min:8,  max:12, name:'벼락치기 취준생', color:'#8B6FE0', soft:'#EBE4FA', characterImage:'/assets/characters/tier3_벼락치기취준생.png' },
+  { min:13, max:18, name:'여의도 주니어',   color:'#E8954D', soft:'#FBEEDE', characterImage:'/assets/characters/tier4_여의도주니어.png' },
+  { min:19, max:24, name:'시사 덕후',       color:'#E04F8C', soft:'#FBE2EE', characterImage:'/assets/characters/tier5_시사덕후.png' },
+  { min:25, max:99, name:'살아있는 위키',   color:'#F5B82E', soft:'#FCEFCD', characterImage:'/assets/characters/tier6_살아있는위키.png' },
+];
+
+export function xpForLevel(level: number): number {
+  return Math.floor(100 * Math.pow(1.4, level - 1));
+}
+
+export function tierOf(level: number): Tier {
+  return TIERS.find(t => level >= t.min && level <= t.max) ?? TIERS[0];
+}
+
+// ── 노드 잠금 레벨 ──────────────────────────────────────
+export const NODE_UNLOCK_LEVELS: Record<string, number> = {
+  graphrag:1, rag:1, knowledge:1, llm:1, vectordb:1,
+  embedding:1, chunking:1, transformer:1, gpt:1, attention:1, nlp:1,
+  prompt:3, tokenize:3, hallucination:3,
+  agent:5, finetune:5,
+  reasoning:6, entity:6,
+  neo4j:7, cypher:8, multimodal:9,
+};
+
+// ── 뱃지 15개 ────────────────────────────────────────────
+export const ALL_BADGES: Badge[] = [
+  { id:'first_login',   name:'첫 발걸음',    category:'attendance', description:'노딩고에 첫 발을 내딛었어요',  condition:'첫 출석',         earned:false },
+  { id:'streak_7',      name:'일주일 개근',  category:'attendance', description:'7일 연속 출석 달성!',         condition:'7일 연속 출석',   earned:false },
+  { id:'streak_30',     name:'한 달 개근',   category:'attendance', description:'30일 연속 출석 달성!',        condition:'30일 연속 출석',  earned:false },
+  { id:'first_explore', name:'첫 탐험',      category:'explore',    description:'첫 번째 노드를 탐험했어요',   condition:'노드 첫 클릭',    earned:false },
+  { id:'explore_10',    name:'동네 탐험가',  category:'explore',    description:'노드 10개를 탐험했어요',      condition:'노드 10개 탐색',  earned:false },
+  { id:'explore_50',    name:'지도 완성자',  category:'explore',    description:'노드 50개를 탐험했어요',      condition:'노드 50개 탐색',  earned:false },
+  { id:'first_quiz',    name:'첫 도전',      category:'quiz',       description:'첫 퀴즈를 완료했어요',        condition:'퀴즈 첫 완료',    earned:false },
+  { id:'quiz_10',       name:'퀴즈 고수',    category:'quiz',       description:'퀴즈 10회를 완료했어요',      condition:'퀴즈 10회 완료',  earned:false },
+  { id:'perfect_5',     name:'완벽주의자',   category:'quiz',       description:'퍼펙트 스코어 5회 달성!',     condition:'퍼펙트 5회',      earned:false },
+  { id:'first_follow',  name:'첫 인연',      category:'social',     description:'첫 번째 친구를 팔로우했어요', condition:'팔로우 1명',      earned:false },
+  { id:'follow_10',     name:'인싸 입문',    category:'social',     description:'10명을 팔로우했어요',         condition:'팔로우 10명',     earned:false },
+  { id:'ranking_top10', name:'랭킹 입성',    category:'social',     description:'랭킹 TOP 10에 진입했어요',    condition:'랭킹 TOP 10',     earned:false },
+  { id:'first_scrap',   name:'첫 스크랩',    category:'special',    description:'첫 번째 키워드를 스크랩했어요', condition:'첫 스크랩',     earned:false },
+  { id:'receipt_10',    name:'영수증 수집가', category:'special',   description:'영수증을 10장 발급했어요',     condition:'영수증 10장',     earned:false },
+  { id:'nodingo_start', name:'노딩고 시작',  category:'special',    description:'노딩고와의 여정을 시작했어요!', condition:'첫 로그인',      earned:true, earnedAt:'2025.05.27' },
+];
+
+export const MOCK_USER_GAME: UserGame = {
+  level: 1, xp: 82,
+  streak: 1, dailyGoal: 2, dailyProgress: 0,
+  scrapped: [],
+  completedQuizzes: [],
+  badges: ALL_BADGES.map(b =>
+    b.id === 'nodingo_start'
+      ? { ...b, earned: true, earnedAt: '2026.05.27' }
+      : { ...b, earned: false, earnedAt: undefined }
+  ),
+  following: 0,
+  totalNodesExplored: 0,
+  totalQuizzesSolved: 0,
+};
+
+export const MOCK_QUIZZES: Record<string, Array<{
+  q: string; options: string[]; a: number;
+  source: { outlet: string; date: string; url?: string };
+}>> = {
+  금리: [
+    { q:'한국은행이 기준금리를 동결한 주된 이유로 언급된 것은?', options:['수출 급감','물가 목표 수렴 전까지 신중한 운용','주식시장 과열','부동산 공급 부족'], a:1, source:{outlet:'Nodingo News', date:'2025.05.20', url:'https://example.com/news/9001'} },
+    { q:'Fed 금리 동결 이후 원/달러 환율은 어느 구간에서 등락했다고 설명됐나?', options:['1,100원대','1,240원대','1,360원대','1,580원대'], a:2, source:{outlet:'Market Brief', date:'2025.05.21', url:'https://example.com/news/9002'} },
+    { q:'시장 참가자들이 전망한 연내 금리 인하 흐름은?', options:['인하 가능성 없음','완만한 인하 가능성','즉각적인 빅스텝 인하','금리 대폭 인상'], a:1, source:{outlet:'Economy Daily', date:'2025.05.22', url:'https://example.com/news/9003'} },
+  ],
+  한국은행: [
+    { q:'한국은행의 통화정책 운용에서 함께 고려되는 두 목표는?', options:['물가 안정과 금융 안정','수출 확대와 관광 진흥','교육 개혁과 복지 확대','환율 고정과 임금 통제'], a:0, source:{outlet:'Nodingo News', date:'2025.05.20', url:'https://example.com/news/9001'} },
+    { q:'한국은행이 섣부른 금리 인하를 경계하는 이유로 맞는 것은?', options:['세수 감소 우려','자산 버블 자극 가능성','무역수지 흑자 확대','국채 발행 중단'], a:1, source:{outlet:'Nodingo News', date:'2025.05.20', url:'https://example.com/news/9001'} },
+    { q:'기준금리 결정에 영향을 주는 해외 변수로 언급된 것은?', options:['OPEC 감산','Fed 통화정책','일본 소비세','중국 관광객'], a:1, source:{outlet:'Market Brief', date:'2025.05.21', url:'https://example.com/news/9002'} },
+  ],
+  ai규제: [
+    { q:'EU AI Act가 특히 엄격한 의무를 부과하는 대상은?', options:['저위험 게임 AI','고위험 AI 시스템','개인 블로그 추천 알고리즘','오프라인 계산기'], a:1, source:{outlet:'AI Policy', date:'2025.05.18', url:'https://example.com/news/9010'} },
+    { q:'국내 AI기본법 논의의 핵심 쟁점은?', options:['산업 육성과 이용자 보호의 균형','모든 AI 서비스 금지','검색엔진 폐쇄','반도체 수입 중단'], a:0, source:{outlet:'Tech Law', date:'2025.05.19', url:'https://example.com/news/9011'} },
+    { q:'글로벌 AI 기업들이 EU 규정 대응을 위해 강화하는 것은?', options:['오프라인 매장','컴플라이언스 조직과 모델 관리 체계','스마트폰 생산라인','게임 퍼블리싱'], a:1, source:{outlet:'Global Tech', date:'2025.05.20', url:'https://example.com/news/9012'} },
+  ],
+  대선: [
+    { q:'대선 후보군 행보가 본격화되며 함께 조율되는 것은?', options:['경선 일정','수능 일정','월드컵 조 편성','금리 고시'], a:0, source:{outlet:'Politics Now', date:'2025.05.16', url:'https://example.com/news/9020'} },
+    { q:'대선 핵심 의제로 언급된 조합은?', options:['민생 경제·안보 외교·청년 주거','날씨·스포츠·여행','음악 차트·영화 예매','해외 축제·패션'], a:0, source:{outlet:'Public Agenda', date:'2025.05.17', url:'https://example.com/news/9021'} },
+    { q:'여론조사 편차가 커지는 이유로 지적된 것은?', options:['조사 방식과 표본 설계 차이','투표소 위치 변경','환율 변동','기온 상승'], a:0, source:{outlet:'Election Lab', date:'2025.05.18', url:'https://example.com/news/9022'} },
+  ],
+  복지정책: [
+    { q:'복지정책 논의에서 함께 고려되는 두 축은?', options:['재정 건전성과 복지 확충','환율과 수출 단가','문화행사와 관광객','기술특허와 게임'], a:0, source:{outlet:'Nodingo AI', date:'2025.05.27'} },
+    { q:'저출생·고령화 대응에서 지적되는 한계는?', options:['단순 예산 증가만으로는 효과가 제한될 수 있음','복지예산이 전혀 필요 없음','의료개혁과 무관함','청년정책을 폐지해야 함'], a:0, source:{outlet:'Nodingo AI', date:'2025.05.27'} },
+    { q:'복지정책의 주요 쟁점으로 맞는 것은?', options:['재원 조달과 정책 효과성','날씨 예보 정확도','해외 스포츠 일정','검색 광고 단가'], a:0, source:{outlet:'Nodingo AI', date:'2025.05.27'} },
+  ],
+  미중관계: [
+    { q:'미중관계에서 경쟁이 확대되는 분야로 맞는 것은?', options:['무역·기술·군사','요리·관광·음악','교육·미술·스포츠','농구·야구·축구'], a:0, source:{outlet:'Nodingo AI', date:'2025.05.27'} },
+    { q:'한국이 미중관계 속에서 받는 압박은?', options:['동맹과 최대 교역국 사이의 포지셔닝 요구','모든 수출 중단 요구','국내 선거 폐지 요구','의료보험 폐지 요구'], a:0, source:{outlet:'Nodingo AI', date:'2025.05.27'} },
+    { q:'미중 갈등이 공급망에 주는 영향으로 맞는 것은?', options:['반도체·에너지 등 전략 산업 불확실성 확대','문화 콘텐츠 제작비 고정','지역 날씨 안정','국내 물가 완전 고정'], a:0, source:{outlet:'Nodingo AI', date:'2025.05.27'} },
+  ],
+  chatgpt: [
+    { q:'ChatGPT 도입이 빠르게 확대되는 분야로 언급된 것은?', options:['교육·의료·법률','농구·야구·축구','조선·원양어업만','오프라인 서점만'], a:0, source:{outlet:'Nodingo AI', date:'2025.05.27'} },
+    { q:'ChatGPT와 같은 생성형 AI에서 규제 기관이 주목하는 이슈는?', options:['개인정보 처리 방식','전기요금 고지서 색상','스포츠 중계권','환율 고정제'], a:0, source:{outlet:'Nodingo AI', date:'2025.05.27'} },
+    { q:'기업용 AI 서비스 확대와 함께 중요해지는 것은?', options:['데이터 보호와 컴플라이언스','종이신문 배달망','오프라인 매표소','수동 계산기'], a:0, source:{outlet:'Nodingo AI', date:'2025.05.27'} },
+  ],
+  graphrag: [
+    { q:'GraphRAG는 다중 홉 질문 정답률을 기존 RAG 대비 얼마나 끌어올렸나?', options:['약 5%','약 12%','약 25%','약 40%'], a:1, source:{outlet:'TechBrief', date:'2024.07.18'} },
+    { q:'GraphRAG가 컴플라이언스 부서에서 선호되는 이유는?', options:['비용이 저렴해서','답변 근거를 그래프로 시각화할 수 있어서','한국어 답변이 자연스러워서','학습이 필요 없어서'], a:1, source:{outlet:'AI Today', date:'2024.11.04'} },
+    { q:'GraphRAG의 핵심 구성 요소가 아닌 것은?', options:['지식그래프','엔티티 추출','이미지 분류','벡터DB'], a:2, source:{outlet:'Dev Weekly', date:'2025.02.21'} },
+  ],
+  default: [
+    { q:'이 키워드와 가장 관련 깊은 개념은?', options:['지식그래프','이미지 처리','음성 인식','블록체인'], a:0, source:{outlet:'Nodingo AI', date:'2025.05.27'} },
+  ],
+};
+
+export const MOCK_RANKING_FRIENDS: RankingEntry[] = [
+  { rank:1,  name:'찬우', avatar:'', level:28, weekXp:1840, persona:'기술' },
+  { rank:2,  name:'상운', avatar:'', level:25, weekXp:1710, persona:'국제' },
+  { rank:3,  name:'성민', avatar:'', level:22, weekXp:1620, persona:'경제' },
+  { rank:4,  name:'장수', avatar:'', level:18, weekXp:1375, persona:'정치' },
+  { rank:5,  name:'유철', avatar:'', level:16, weekXp:1190, persona:'사회' },
+  { rank:6,  name:'수현', avatar:'', level:13, weekXp:980,  persona:'기술' },
+  { rank:7,  name:'준상', avatar:'', level:9,  weekXp:760,  persona:'경제' },
+  { rank:8,  name:'준모', avatar:'', level:7,  weekXp:610,  persona:'국제' },
+  { rank:24, name:'딩고', avatar:'', level:4,  weekXp:425,  persona:'경제', isMe:true },
+];
+
+export const MOCK_RANKING_PERSONA: RankingEntry[] = [
+  { rank:1,  name:'서윤', avatar:'', level:24, weekXp:1540, persona:'경제' },
+  { rank:2,  name:'민재', avatar:'', level:21, weekXp:1415, persona:'경제' },
+  { rank:3,  name:'하린', avatar:'', level:19, weekXp:1320, persona:'경제' },
+  { rank:4,  name:'도윤', avatar:'', level:17, weekXp:1180, persona:'경제' },
+  { rank:5,  name:'지안', avatar:'', level:15, weekXp:1030, persona:'경제' },
+  { rank:6,  name:'태오', avatar:'', level:12, weekXp:890,  persona:'경제' },
+  { rank:7,  name:'나은', avatar:'', level:10, weekXp:770,  persona:'경제' },
+  { rank:8,  name:'이준', avatar:'', level:8,  weekXp:650,  persona:'경제' },
+  { rank:12, name:'딩고', avatar:'', level:4,  weekXp:425,  persona:'경제', isMe:true },
+];

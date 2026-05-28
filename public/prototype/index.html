@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>Nodingo · Knowledge Graph</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://cdn.jsdelivr.net" />
+<link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<style>
+  :root { color-scheme: light; }
+  html, body {
+    margin: 0; padding: 0;
+    height: 100%;
+    background: #EFEEEA;
+    font-family: Pretendard, -apple-system, system-ui, sans-serif;
+  }
+  body {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; overflow: hidden;
+  }
+  .stage {
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    padding: 40px;
+  }
+
+  /* ─── animations ───────────────────────────────────────── */
+  @keyframes nodingo-slide-in {
+    /* opacity-free so the panel stays visible even if rAF is throttled before
+       the first user gesture; just slide+pop in. */
+    0%   { transform: translateX(-12px) scale(0.98); }
+    100% { transform: translateX(0) scale(1); }
+  }
+  @keyframes nodingo-sheet-in {
+    /* Small-offset bounce so that even if rAF is throttled before the first
+       user gesture (animation never advances past 0%), the sheet remains
+       almost in place — never below the screen. */
+    0%   { transform: translateY(40px); }
+    65%  { transform: translateY(-6px); }
+    100% { transform: translateY(0); }
+  }
+  @keyframes nodingo-pulse {
+    0%   { transform: scale(1);    opacity: 0.65; }
+    70%  { transform: scale(1.45); opacity: 0; }
+    100% { transform: scale(1.45); opacity: 0; }
+  }
+  .nodingo-pulse { animation: nodingo-pulse 1.8s ease-out infinite; }
+
+  @keyframes nodingo-toast {
+    0%   { opacity: 0; transform: translate(-50%, 14px); }
+    100% { opacity: 1; transform: translate(-50%, 0); }
+  }
+
+  @keyframes nodingo-fade-in {
+    from { opacity: 0; } to { opacity: 1; }
+  }
+  @keyframes nodingo-modal-in {
+    0%   { opacity: 0; transform: translateY(28px) scale(0.97); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes nodingo-receipt-in {
+    0%   { opacity: 0; transform: translateY(120%); }
+    60%  { opacity: 1; transform: translateY(-6%); }
+    80%  { transform: translateY(2%); }
+    100% { transform: translateY(0); }
+  }
+  @keyframes nodingo-confetti {
+    0%   { transform: translateY(0) rotate(0deg);    opacity: 1; }
+    100% { transform: translateY(120vh) rotate(720deg); opacity: 0.6; }
+  }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-thumb { background: #DEDED9; border-radius: 999px; }
+</style>
+</head>
+<body>
+  <div id="root" class="stage"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js"
+          integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L"
+          crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"
+          integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm"
+          crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"
+          integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y"
+          crossorigin="anonymous"></script>
+
+  <!-- data + meta -->
+  <script src="graph-data.js"></script>
+  <script src="nodingo-meta.js"></script>
+
+  <!-- components -->
+  <script type="text/babel" src="ios-frame.jsx"></script>
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <script type="text/babel" src="nodingo-graph.jsx"></script>
+  <script type="text/babel" src="nodingo-modals.jsx"></script>
+  <script type="text/babel" src="nodingo-community.jsx"></script>
+  <script type="text/babel" src="nodingo-app.jsx"></script>
+
+  <script type="text/babel">
+    function Root() {
+      return (
+        <IOSDevice width={390} height={812}>
+          <NodingoApp />
+        </IOSDevice>
+      );
+    }
+
+    const NEEDED = [
+      'IOSDevice', 'TweaksPanel', 'useTweaks',
+      'NodingoApp', 'NodingoGraphCanvas', 'NodingoSummaryPanel',
+      'NodingoQuizModal', 'NodingoReceiptModal',
+      'NodingoRankingScreen', 'NodingoProfileScreen',
+    ];
+    const mount = () => {
+      if (NEEDED.some(k => !window[k])) return setTimeout(mount, 30);
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<Root />);
+    };
+    mount();
+  </script>
+</body>
+</html>

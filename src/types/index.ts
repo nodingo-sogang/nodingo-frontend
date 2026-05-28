@@ -129,6 +129,10 @@ export interface GraphDataResponse {
 export interface NewsItemBrief {
   id: number;
   title: string;
+  url?: string;
+  outlet?: string;
+  date?: string;
+  snippet?: string;
 }
 
 export interface NodeSummaryResponse {

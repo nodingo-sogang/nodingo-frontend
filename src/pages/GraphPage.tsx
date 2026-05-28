@@ -1,665 +1,611 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { useQuery, useQueries, useMutation } from '@tanstack/react-query';
-import {
-  forceSimulation,
-  forceLink,
-  forceManyBody,
-  forceCenter,
-  forceCollide,
-  forceX,
-  forceY,
-} from 'd3-force';
-import type { SimulationNodeDatum, SimulationLinkDatum, Simulation } from 'd3-force';
-import { graphApi } from '../api/graph';
-import { useAuthStore } from '../store/authStore';
-import { useTheme } from '../hooks/useTheme';
-import BottomNav, { type BottomNavTab } from '../components/layout/BottomNav';
-import BottomSheet from '../components/common/BottomSheet';
-import type { GraphNodeResponse, NodeSummaryResponse } from '../types';
-import { MOCK_TABS, MOCK_GRAPH, MOCK_SUMMARIES } from '../mocks';
-import styles from './GraphPage.module.css';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
+import HUD from '../components/game/HUD';
+import QuizModal from '../components/game/QuizModal';
+import ReceiptModal from '../components/game/ReceiptModal';
+import BottomNav from '../components/layout/BottomNav';
+import GraphScreen from './graph/GraphScreen';
+import RankingScreen from './ranking/RankingScreen';
+import ProfileScreen from './profile/ProfileScreen';
+import { MOCK_SUMMARIES, MOCK_USER_GAME, NODE_UNLOCK_LEVELS, xpForLevel, tierOf } from '../mocks';
+import type { UserGame, Badge, ReceiptData } from '../types/game';
+import type { NodeSummaryResponse } from '../types';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+function checkBadges(updated: UserGame): Badge | null {
+  const conditions: Array<[string, boolean]> = [
+    ['first_login', true],
+    ['first_explore', updated.totalNodesExplored >= 1],
+    ['explore_10', updated.totalNodesExplored >= 10],
+    ['explore_50', updated.totalNodesExplored >= 50],
+    ['first_quiz', updated.completedQuizzes.length >= 1 || updated.totalQuizzesSolved >= 1],
+    ['quiz_10', updated.totalQuizzesSolved >= 10],
+    ['first_scrap', updated.scrapped.length >= 1],
+    ['first_follow', updated.following >= 1],
+    ['follow_10', updated.following >= 10],
+    ['streak_7', updated.streak >= 7],
+    ['streak_30', updated.streak >= 30],
+  ];
 
-const SVG_W = 500;
-const SVG_H = 540;
-
-function nodeColor(persona: string): string {
-  const map: Record<string, string> = {
-    ECONOMY: '#ff9f0a',
-    POLITICS: '#0a84ff',
-    TECHNOLOGY: '#30d158',
-    SOCIETY: '#bf5af2',
-    CULTURE: '#ff453a',
-    INTERNATIONAL: '#64d2ff',
-  };
-  return map[persona] ?? '#0066cc';
+  for (const [id, met] of conditions) {
+    const badge = updated.badges.find(x => x.id === id);
+    if (met && badge && !badge.earned) return { ...badge, earned: true };
+  }
+  return null;
 }
 
-function nodeRadius(score: number): number {
-  return 5 + score * 9;
-}
+type RewardData =
+  | { kind: 'level'; level: number; tierName: string; tierColor: string; characterImage: string; unlockedCount: number }
+  | { kind: 'tier'; level: number; tierName: string; tierColor: string; characterImage: string; unlockedCount: number }
+  | { kind: 'badge'; badge: Badge; tierColor: string };
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+function RewardPopup({ reward, onClose }: { reward: RewardData | null; onClose: () => void }) {
+  if (!reward) return null;
 
-type SimNode = GraphNodeResponse & SimulationNodeDatum;
-type SimLink = SimulationLinkDatum<SimNode> & { weight: number };
-type ScrappedNode = { id: number; label: string; persona: string; summary: string };
-
-// ─── GraphPage ────────────────────────────────────────────────────────────────
-
-export default function GraphPage() {
-  const { logout } = useAuthStore();
-  const { theme, toggleTheme } = useTheme();
-
-  const [activeTab, setActiveTab] = useState<BottomNavTab>('graph');
-  const [highlightKeywordId, setHighlightKeywordId] = useState<number | null>(null);
-  const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null);
-  const [hoveredNodeId, setHoveredNodeId] = useState<number | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [scrappedNodes, setScrappedNodes] = useState<Map<number, ScrappedNode>>(new Map());
-  const [isLiveData, setIsLiveData] = useState(false);
-
-  // Pan/zoom
-  const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
-  const transformRef = useRef(transform);
-  useEffect(() => { transformRef.current = transform; }, [transform]);
-
-  const svgRef = useRef<SVGSVGElement>(null);
-  const isPanning = useRef(false);
-  const panStart = useRef({ x: 0, y: 0 });
-  const lastTransform = useRef(transform);
-  const pinchDist = useRef<number | null>(null);
-
-  // Force simulation
-  const simNodesRef = useRef<SimNode[]>([]);
-  const simulationRef = useRef<Simulation<SimNode, SimLink> | null>(null);
-  const [positions, setPositions] = useState<Map<number, { x: number; y: number }>>(new Map());
-
-  // Drag
-  const dragNodeRef = useRef<SimNode | null>(null);
-  const dragMoved = useRef(false);
-
-  // ── Queries ──────────────────────────────────────────────────────────────────
-
-  const { data: tabsData, isLoading: tabsLoading } = useQuery({
-    queryKey: ['tabs'],
-    queryFn: () =>
-      graphApi.getTabs().then((r) => {
-        setIsLiveData(true);
-        return r.data.data;
-      }).catch(() => {
-        setIsLiveData(false);
-        return MOCK_TABS;
-      }),
-    placeholderData: MOCK_TABS,
-  });
-
-  const tabs = tabsData?.tabs ?? MOCK_TABS.tabs;
-
-  // 모든 탭의 그래프를 동시에 fetch
-  const graphQueries = useQueries({
-    queries: tabs.map((tab) => ({
-      queryKey: ['graph', tab.keyword_id],
-      queryFn: () =>
-        graphApi
-          .getGraphData(tab.keyword_id)
-          .then((r) => r.data.data)
-          .catch(() => MOCK_GRAPH[tab.keyword_id] ?? MOCK_GRAPH[1]),
-      placeholderData: MOCK_GRAPH[tab.keyword_id] ?? MOCK_GRAPH[1],
-    })),
-  });
-
-  const graphLoading = graphQueries.some((q) => q.isLoading && !q.data);
-
-  // 노드/엣지 합산 (중복 제거) + 탭별 nodeId Set
-  const { allNodes, allEdges, tabNodeIds } = useMemo(() => {
-    const nodeMap = new Map<number, GraphNodeResponse>();
-    const edgeKey = new Set<string>();
-    const edges: { source: number; target: number; weight: number }[] = [];
-    const tabNodeIds = new Map<number, Set<number>>();
-
-    tabs.forEach((tab, i) => {
-      const data = graphQueries[i]?.data;
-      if (!data) return;
-
-      const ids = new Set<number>();
-      data.nodes.forEach((n) => { nodeMap.set(n.id, n); ids.add(n.id); });
-      tabNodeIds.set(tab.keyword_id, ids);
-
-      data.edges.forEach((e) => {
-        const k = `${Math.min(e.source, e.target)}-${Math.max(e.source, e.target)}`;
-        if (!edgeKey.has(k)) { edgeKey.add(k); edges.push(e); }
-      });
-    });
-
-    return { allNodes: [...nodeMap.values()], allEdges: edges, tabNodeIds };
-  }, [tabs, graphQueries]);
-
-  const { data: nodeSummary, isLoading: summaryLoading } = useQuery<NodeSummaryResponse | null>({
-    queryKey: ['nodeSummary', selectedNodeId],
-    queryFn: async () => {
-      if (!selectedNodeId) return null;
-      return graphApi
-        .getNodeSummary(selectedNodeId)
-        .then((r) => r.data.data)
-        .catch(() => MOCK_SUMMARIES[selectedNodeId] ?? null);
-    },
-    enabled: selectedNodeId !== null && sheetOpen,
-    placeholderData: selectedNodeId !== null ? (MOCK_SUMMARIES[selectedNodeId] ?? null) : null,
-  });
-
-  // ── Scrap mutation ────────────────────────────────────────────────────────────
-
-  const scrapMutation = useMutation({
-    mutationFn: (node: ScrappedNode) =>
-      scrappedNodes.has(node.id)
-        ? graphApi.unscrapKeyword(node.id)
-        : graphApi.scrapKeyword(node.id),
-    onMutate: (node) => {
-      setScrappedNodes((prev) => {
-        const next = new Map(prev);
-        if (next.has(node.id)) next.delete(node.id);
-        else next.set(node.id, node);
-        return next;
-      });
-    },
-  });
-
-  // ── Force simulation ──────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (allNodes.length === 0) return;
-
-    simulationRef.current?.stop();
-
-    const simNodes: SimNode[] = allNodes.map((n) => {
-      const existing = simNodesRef.current.find((s) => s.id === n.id);
-      return existing
-        ? { ...n, x: existing.x ?? SVG_W / 2, y: existing.y ?? SVG_H / 2 }
-        : { ...n, x: SVG_W / 2 + (Math.random() - 0.5) * 100, y: SVG_H / 2 + (Math.random() - 0.5) * 100 };
-    });
-    simNodesRef.current = simNodes;
-
-    const simLinks: SimLink[] = allEdges.map((e) => ({
-      source: e.source as unknown as SimNode,
-      target: e.target as unknown as SimNode,
-      weight: e.weight,
-    }));
-
-    // 노드 수에 따라 반발력 조정 (노드가 적을수록 약하게)
-    const chargeStrength = Math.max(-200, -20 * Math.sqrt(simNodes.length));
-
-    const sim = forceSimulation<SimNode>(simNodes)
-      .force(
-        'link',
-        forceLink<SimNode, SimLink>(simLinks)
-          .id((d) => d.id)
-          .distance((l) => 80 + (1 - l.weight) * 40)
-          .strength(0.5),
-      )
-      .force('charge', forceManyBody<SimNode>().strength(chargeStrength))
-      .force('center', forceCenter<SimNode>(SVG_W / 2, SVG_H / 2).strength(0.15))
-      .force('x', forceX<SimNode>(SVG_W / 2).strength(0.08))
-      .force('y', forceY<SimNode>(SVG_H / 2).strength(0.08))
-      .force('collide', forceCollide<SimNode>((d) => nodeRadius(d.score) + 8))
-      .alphaDecay(0.025)
-      .on('tick', () => {
-        // 노드가 SVG 영역을 벗어나지 않도록 클램핑
-        simNodesRef.current.forEach((n) => {
-          const r = nodeRadius(n.score) + 8;
-          n.x = Math.max(r, Math.min(SVG_W - r, n.x ?? SVG_W / 2));
-          n.y = Math.max(r, Math.min(SVG_H - r, n.y ?? SVG_H / 2));
-        });
-        const map = new Map<number, { x: number; y: number }>();
-        simNodesRef.current.forEach((n) => map.set(n.id, { x: n.x!, y: n.y! }));
-        setPositions(new Map(map));
-      });
-
-    simulationRef.current = sim;
-    return () => { sim.stop(); };
-  }, [allNodes, allEdges]);
-
-  // ── Highlight logic ───────────────────────────────────────────────────────────
-
-  // 탭 하이라이트 대상 노드들
-  const tabHighlightIds = useMemo(() => {
-    if (highlightKeywordId === null) return null;
-    return tabNodeIds.get(highlightKeywordId) ?? null;
-  }, [highlightKeywordId, tabNodeIds]);
-
-  // 호버 인접 노드들
-  const hoverAdjacentIds = useMemo(() => {
-    if (hoveredNodeId === null) return null;
-    const set = new Set<number>([hoveredNodeId]);
-    allEdges.forEach((e) => {
-      if (e.source === hoveredNodeId) set.add(e.target);
-      if (e.target === hoveredNodeId) set.add(e.source);
-    });
-    return set;
-  }, [hoveredNodeId, allEdges]);
-
-  function isDimmed(nodeId: number): boolean {
-    // 호버 중이면 호버 기준 우선
-    if (hoverAdjacentIds !== null) return !hoverAdjacentIds.has(nodeId);
-    // 탭 하이라이트 중이면 탭 기준
-    if (tabHighlightIds !== null) return !tabHighlightIds.has(nodeId);
-    return false;
-  }
-
-  function isHighlighted(nodeId: number): boolean {
-    if (hoverAdjacentIds !== null) return hoverAdjacentIds.has(nodeId);
-    if (tabHighlightIds !== null) return tabHighlightIds.has(nodeId);
-    return false;
-  }
-
-  // ── SVG coordinate helper ─────────────────────────────────────────────────────
-
-  const toSvgCoords = useCallback((clientX: number, clientY: number) => {
-    const rect = svgRef.current!.getBoundingClientRect();
-    const { x, y, scale } = transformRef.current;
-    const svgX = (clientX - rect.left) * (SVG_W / rect.width);
-    const svgY = (clientY - rect.top) * (SVG_H / rect.height);
-    return { x: (svgX - x) / scale, y: (svgY - y) / scale };
-  }, []);
-
-  // ── Pan handlers ──────────────────────────────────────────────────────────────
-
-  const onBgPointerDown = useCallback((e: React.PointerEvent<SVGRectElement>) => {
-    isPanning.current = true;
-    panStart.current = { x: e.clientX, y: e.clientY };
-    lastTransform.current = transformRef.current;
-    (e.currentTarget as Element).setPointerCapture(e.pointerId);
-  }, []);
-
-  const onSvgPointerMove = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
-    if (dragNodeRef.current) {
-      dragMoved.current = true;
-      const { x, y } = toSvgCoords(e.clientX, e.clientY);
-      dragNodeRef.current.fx = x;
-      dragNodeRef.current.fy = y;
-      simulationRef.current?.alphaTarget(0.3).restart();
-      return;
-    }
-    if (!isPanning.current) return;
-    const dx = e.clientX - panStart.current.x;
-    const dy = e.clientY - panStart.current.y;
-    setTransform({ ...lastTransform.current, x: lastTransform.current.x + dx, y: lastTransform.current.y + dy });
-  }, [toSvgCoords]);
-
-  const onSvgPointerUp = useCallback(() => {
-    isPanning.current = false;
-    if (dragNodeRef.current) {
-      dragNodeRef.current.fx = null;
-      dragNodeRef.current.fy = null;
-      simulationRef.current?.alphaTarget(0);
-      dragNodeRef.current = null;
-    }
-  }, []);
-
-  const onWheel = useCallback((e: React.WheelEvent<SVGSVGElement>) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    setTransform((prev) => ({ ...prev, scale: Math.min(4, Math.max(0.2, prev.scale * delta)) }));
-  }, []);
-
-  const onTouchStart = useCallback((e: React.TouchEvent<SVGSVGElement>) => {
-    if (e.touches.length === 2) {
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      pinchDist.current = Math.sqrt(dx * dx + dy * dy);
-    }
-  }, []);
-
-  const onTouchMove = useCallback((e: React.TouchEvent<SVGSVGElement>) => {
-    if (e.touches.length === 2 && pinchDist.current !== null) {
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      const newDist = Math.sqrt(dx * dx + dy * dy);
-      setTransform((prev) => ({
-        ...prev,
-        scale: Math.min(4, Math.max(0.2, prev.scale * (newDist / pinchDist.current!))),
-      }));
-      pinchDist.current = newDist;
-    }
-  }, []);
-
-  // ── Node drag handlers ────────────────────────────────────────────────────────
-
-  const onNodePointerDown = useCallback((e: React.PointerEvent<SVGCircleElement>, node: SimNode) => {
-    e.stopPropagation();
-    dragNodeRef.current = node;
-    dragMoved.current = false;
-    node.fx = node.x;
-    node.fy = node.y;
-    (e.currentTarget as Element).setPointerCapture(e.pointerId);
-  }, []);
-
-  const onNodePointerUp = useCallback((e: React.PointerEvent<SVGCircleElement>, nodeId: number) => {
-    e.stopPropagation();
-    if (!dragMoved.current) {
-      setSelectedNodeId(nodeId);
-      setSheetOpen(true);
-    }
-    if (dragNodeRef.current) {
-      dragNodeRef.current.fx = null;
-      dragNodeRef.current.fy = null;
-      simulationRef.current?.alphaTarget(0);
-      dragNodeRef.current = null;
-    }
-  }, []);
-
-  const handleRecenter = () => setTransform({ x: 0, y: 0, scale: 1 });
-
-  // ── Render ────────────────────────────────────────────────────────────────────
+  const isBadge = reward.kind === 'badge';
+  const color = isBadge ? reward.tierColor : reward.tierColor;
+  const title = isBadge
+    ? '뱃지 획득!'
+    : reward.kind === 'tier'
+      ? `${reward.tierName} 단계로 성장!`
+      : `Lv ${reward.level} 달성!`;
+  const subtitle = isBadge
+    ? reward.badge.name
+    : reward.unlockedCount > 0
+      ? `${reward.unlockedCount}개의 안개 키워드가 더 선명해졌어요`
+      : '더 깊은 지식지도를 탐험할 준비가 되었어요';
+  const learn = isBadge
+    ? reward.badge.description
+    : '퀴즈, 스크랩, 노드 탐험으로 딩고의 관심사가 더 또렷해졌어요.';
+  const action = isBadge
+    ? reward.badge.condition
+    : '새 키워드 탐색 · 뉴스 기반 퀴즈 · 스크랩 추천 정교화';
 
   return (
-    <div className={styles.page}>
-      {/* Top bar */}
-      <header className={styles.topBar}>
-        <div className={styles.logo}>
-          <svg width="20" height="20" viewBox="0 0 22 22" fill="none">
-            <circle cx="11" cy="11" r="4" fill="#2997ff" />
-            <circle cx="4" cy="5" r="2.5" fill="#2997ff" opacity="0.7" />
-            <circle cx="18" cy="5" r="2.5" fill="#2997ff" opacity="0.7" />
-            <circle cx="4" cy="17" r="2.5" fill="#2997ff" opacity="0.7" />
-            <circle cx="18" cy="17" r="2.5" fill="#2997ff" opacity="0.7" />
-            <line x1="11" y1="11" x2="4" y2="5" stroke="#2997ff" strokeWidth="1.5" opacity="0.4" />
-            <line x1="11" y1="11" x2="18" y2="5" stroke="#2997ff" strokeWidth="1.5" opacity="0.4" />
-            <line x1="11" y1="11" x2="4" y2="17" stroke="#2997ff" strokeWidth="1.5" opacity="0.4" />
-            <line x1="11" y1="11" x2="18" y2="17" stroke="#2997ff" strokeWidth="1.5" opacity="0.4" />
-          </svg>
-          <span>Nodingo</span>
-        </div>
-        <div className={styles.topBarActions}>
-          <span className={isLiveData ? styles.badgeLive : styles.badgeMock}>
-            {isLiveData ? 'LIVE' : 'MOCK'}
-          </span>
-          <button className={styles.themeToggle} onClick={toggleTheme} title={theme === 'dark' ? '라이트 모드' : '다크 모드'}>
-            {theme === 'dark' ? (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
-                <circle cx="12" cy="12" r="5" />
-                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
-                <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
-              </svg>
-            )}
-          </button>
-          <button className={styles.logoutBtn} onClick={logout}>로그아웃</button>
-        </div>
-      </header>
+    <div style={{
+      position: 'absolute',
+      inset: 0,
+      zIndex: 320,
+      background: isBadge ? '#FFFFFF' : `linear-gradient(180deg, ${color} 0%, #6EC8F2 100%)`,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '52px 26px 28px',
+      textAlign: 'center',
+      animation: 'nodingo-modal-in 360ms cubic-bezier(.2,.7,.2,1)',
+    }}>
+      <div style={{ flex: 1 }} />
+      <div style={{
+        width: 148,
+        height: 148,
+        borderRadius: '50%',
+        background: isBadge ? '#FAF7F1' : 'rgba(255,255,255,0.22)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 28,
+        boxShadow: isBadge ? '0 12px 28px rgba(15,17,21,0.08)' : 'none',
+        overflow: 'hidden',
+      }}>
+        {isBadge ? (
+          <span style={{ fontSize: 70 }}>🏅</span>
+        ) : (
+          <img
+            src={reward.characterImage}
+            alt={reward.tierName}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        )}
+      </div>
 
-      {/* Keyword filter chips */}
-      {activeTab === 'graph' && (
-        <div className={styles.tabs}>
-          {tabsLoading
-            ? Array.from({ length: 3 }).map((_, i) => <div key={i} className={styles.tabSkeleton} />)
-            : tabs.map((tab) => (
+      <div style={{
+        fontSize: isBadge ? 32 : 30,
+        fontWeight: 900,
+        color: isBadge ? '#0F1115' : '#FFFFFF',
+        letterSpacing: '-0.04em',
+        lineHeight: 1.15,
+      }}>
+        {title}
+      </div>
+      <div style={{
+        marginTop: 10,
+        fontSize: 18,
+        fontWeight: 900,
+        color: isBadge ? color : '#FFFFFF',
+        lineHeight: 1.35,
+      }}>
+        {subtitle}
+      </div>
+
+      <div style={{
+        width: '100%',
+        marginTop: 28,
+        display: 'grid',
+        gridTemplateColumns: '1fr',
+        gap: 10,
+      }}>
+        <div style={{
+          background: isBadge ? '#FAF7F1' : 'rgba(255,255,255,0.96)',
+          borderRadius: 20,
+          padding: '14px 16px',
+          textAlign: 'left',
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 900, color: '#6B6B66', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+            이제 할 수 있는 것
+          </div>
+          <div style={{ marginTop: 5, fontSize: 14, fontWeight: 800, color: '#0F1115', lineHeight: 1.45 }}>
+            {action}
+          </div>
+        </div>
+        <div style={{
+          background: isBadge ? '#FAF7F1' : 'rgba(255,255,255,0.96)',
+          borderRadius: 20,
+          padding: '14px 16px',
+          textAlign: 'left',
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 900, color: '#6B6B66', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+            알게 된 것
+          </div>
+          <div style={{ marginTop: 5, fontSize: 14, fontWeight: 800, color: '#0F1115', lineHeight: 1.45 }}>
+            {learn}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ flex: 1 }} />
+
+      <button onClick={onClose} style={{
+        width: '100%',
+        padding: '15px 0',
+        borderRadius: 20,
+        background: isBadge ? color : '#FFFFFF',
+        color: isBadge ? '#FFFFFF' : color,
+        border: 'none',
+        cursor: 'pointer',
+        fontSize: 17,
+        fontWeight: 900,
+        boxShadow: isBadge ? `0 4px 0 ${color}99` : '0 6px 0 rgba(15,17,21,0.10)',
+      }}>
+        계속하기
+      </button>
+    </div>
+  );
+}
+
+type ScrappedKeyword = {
+  id: number;
+  label: string;
+  persona: string;
+  summary: string;
+};
+
+type Tab = 'graph' | 'scrap' | 'ranking' | 'profile';
+
+function fallbackNews(summary: NodeSummaryResponse | undefined, item: ScrappedKeyword) {
+  if (summary?.news && summary.news.length > 0) return summary.news;
+  return [{
+    id: item.id * 100,
+    title: `${item.label} 관련 원문`,
+    outlet: 'Nodingo Source',
+    date: '2025.05.27',
+    url: `https://example.com/source/${item.id}`,
+    snippet: item.summary,
+  }];
+}
+
+function ScrapScreen({
+  items,
+  onOpen,
+}: {
+  items: ScrappedKeyword[];
+  onOpen: (item: ScrappedKeyword) => void;
+}) {
+  return (
+    <div style={{
+      height: '100%',
+      overflowY: 'auto',
+      background: '#FAF7F1',
+      padding: '16px 16px 30px',
+      overscrollBehavior: 'contain',
+    }}>
+      <div style={{ marginBottom: 14 }}>
+        <div style={{
+          fontSize: 11,
+          fontWeight: 800,
+          color: '#6B6B66',
+          letterSpacing: '.08em',
+          textTransform: 'uppercase',
+        }}>
+          딩고의 스크랩
+        </div>
+        <div style={{
+          marginTop: 4,
+          fontSize: 24,
+          fontWeight: 900,
+          color: '#0F1115',
+          letterSpacing: '-0.03em',
+        }}>
+          모아둔 키워드와 기사 ♥
+        </div>
+      </div>
+
+      {items.length === 0 ? (
+        <div style={{
+          marginTop: 24,
+          padding: '34px 18px',
+          borderRadius: 22,
+          background: '#FFFFFF',
+          textAlign: 'center',
+          color: '#6B6B66',
+          fontSize: 13,
+          fontWeight: 700,
+          lineHeight: 1.55,
+        }}>
+          아직 스크랩한 키워드가 없어요.<br />
+          그래프에서 관심 키워드의 하트를 눌러 모아보세요.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {items.map(item => {
+            const summary = MOCK_SUMMARIES[item.id];
+            const news = fallbackNews(summary, item);
+            return (
+              <article key={item.id} style={{
+                background: '#FFFFFF',
+                borderRadius: 22,
+                padding: 14,
+                boxShadow: '0 2px 8px rgba(15,17,21,0.04)',
+              }}>
                 <button
-                  key={tab.keyword_id}
-                  className={[
-                    styles.tab,
-                    highlightKeywordId === tab.keyword_id ? styles.tabActive : '',
-                  ].filter(Boolean).join(' ')}
-                  onClick={() => setHighlightKeywordId((prev) => (prev === tab.keyword_id ? null : tab.keyword_id))}
+                  onClick={() => onOpen(item)}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    border: 'none',
+                    background: 'transparent',
+                    padding: 0,
+                    cursor: 'pointer',
+                  }}
                 >
-                  {tab.word}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{
+                      width: 9,
+                      height: 9,
+                      borderRadius: 999,
+                      background: '#E8657A',
+                      boxShadow: '0 0 8px #E8657A66',
+                    }} />
+                    <span style={{ fontSize: 17, fontWeight: 900, color: '#0F1115' }}>{item.label}</span>
+                    <span style={{
+                      marginLeft: 'auto',
+                      padding: '3px 8px',
+                      borderRadius: 999,
+                      background: '#F4F4F0',
+                      color: '#6B6B66',
+                      fontSize: 10.5,
+                      fontWeight: 800,
+                    }}>
+                      {item.persona}
+                    </span>
+                  </div>
+                  <p style={{
+                    marginTop: 8,
+                    fontSize: 12.5,
+                    lineHeight: 1.55,
+                    color: '#4A4C50',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}>
+                    {item.summary.replace(/\*\*/g, '')}
+                  </p>
                 </button>
-              ))}
+
+                <div style={{
+                  marginTop: 12,
+                  paddingTop: 12,
+                  borderTop: '1px dashed #ECECE8',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 7,
+                }}>
+                  {news.slice(0, 3).map(article => (
+                    <a
+                      key={article.id}
+                      href={article.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: 'block',
+                        padding: '10px 11px',
+                        borderRadius: 14,
+                        background: '#FAF7F1',
+                        border: '1px solid #EFEEEA',
+                        textDecoration: 'none',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        {article.outlet && (
+                          <span style={{
+                            padding: '2px 7px',
+                            borderRadius: 999,
+                            background: '#0F1115',
+                            color: '#FFFFFF',
+                            fontSize: 9.5,
+                            fontWeight: 800,
+                          }}>
+                            {article.outlet}
+                          </span>
+                        )}
+                        {article.date && (
+                          <span style={{ fontSize: 10.5, color: '#6B6B66', fontWeight: 700 }}>
+                            {article.date}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0F1115', lineHeight: 1.35 }}>
+                        {article.title}
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
+    </div>
+  );
+}
 
-      {/* Main content */}
-      <main className={styles.main}>
-        {activeTab === 'graph' && (
-          <>
-            {graphLoading && (
-              <div className={styles.graphLoader}>
-                <div className={styles.spinner} />
-              </div>
-            )}
+export default function GraphPage() {
+  const location = useLocation();
+  const forceMock = location.pathname === '/preview';
+  const [userGame, setUserGame] = useState<UserGame>(MOCK_USER_GAME);
+  const [tab, setTab] = useState<Tab>('graph');
+  const [quizFor, setQuizFor] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<ReceiptData | null>(null);
+  const [unlockingNodes, setUnlockingNodes] = useState<Set<string>>(new Set());
+  const [reward, setReward] = useState<RewardData | null>(null);
+  const [receiptShownToday, setReceiptShownToday] = useState(false);
+  const [scrappedKeywords, setScrappedKeywords] = useState<ScrappedKeyword[]>([]);
 
-            {!graphLoading && (
-              <svg
-                ref={svgRef}
-                className={styles.svg}
-                viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-                onPointerMove={onSvgPointerMove}
-                onPointerUp={onSvgPointerUp}
-                onPointerCancel={onSvgPointerUp}
-                onWheel={onWheel}
-                onTouchStart={onTouchStart}
-                onTouchMove={onTouchMove}
-                style={{ touchAction: 'none' }}
-              >
-                <defs>
-                  {/* 노드 글로우: blur만 적용 → 자연스러운 그라디언트 페이드 */}
-                  <filter id="node-glow" x="-200%" y="-200%" width="500%" height="500%">
-                    <feGaussianBlur stdDeviation="7" />
-                  </filter>
-                  {/* 선택 시 추가 외곽 글로우 */}
-                  <filter id="node-glow-lg" x="-250%" y="-250%" width="600%" height="600%">
-                    <feGaussianBlur stdDeviation="12" />
-                  </filter>
-                  {/* 코어 흰 점 */}
-                  <filter id="core-glow" x="-300%" y="-300%" width="700%" height="700%">
-                    <feGaussianBlur stdDeviation="1.5" />
-                  </filter>
-                  {/* 하이라이트 엣지 */}
-                  <filter id="edge-glow" x="-20%" y="-300%" width="140%" height="700%">
-                    <feGaussianBlur stdDeviation="1.2" result="blur" />
-                    <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-                  </filter>
-                </defs>
+  const prevLevelRef = useRef(userGame.level);
 
-                <rect x="0" y="0" width={SVG_W} height={SVG_H} fill="transparent" onPointerDown={onBgPointerDown} />
+  // Daily first-visit XP
+  useEffect(() => {
+    const today = new Date().toDateString();
+    const last = localStorage.getItem('nodingo_last_visit');
+    if (last !== today) {
+      localStorage.setItem('nodingo_last_visit', today);
+      setUserGame(prev => applyXp(prev, 10));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-                <g transform={`translate(${transform.x},${transform.y}) scale(${transform.scale})`}>
-                  {/* Edges — 성좌선 */}
-                  {allEdges.map((edge, i) => {
-                    const src = positions.get(edge.source);
-                    const tgt = positions.get(edge.target);
-                    if (!src || !tgt) return null;
-                    const srcDimmed = isDimmed(edge.source);
-                    const tgtDimmed = isDimmed(edge.target);
-                    const edgeDimmed = srcDimmed || tgtDimmed;
-                    const edgeHighlighted = isHighlighted(edge.source) && isHighlighted(edge.target);
+  // Watch for level-up to trigger unlock animation
+  useEffect(() => {
+    if (userGame.level > prevLevelRef.current) {
+      const previousLevel = prevLevelRef.current;
+      const toUnlock = Object.entries(NODE_UNLOCK_LEVELS)
+        .filter(([, lv]) => lv > previousLevel && lv <= userGame.level)
+        .map(([id]) => id);
+      const prevTier = tierOf(previousLevel);
+      const nextTier = tierOf(userGame.level);
+      prevLevelRef.current = userGame.level;
+      if (toUnlock.length > 0) {
+        setUnlockingNodes(new Set(toUnlock));
+        setTimeout(() => setUnlockingNodes(new Set()), 1200);
+      }
+      setReward({
+        kind: prevTier.name !== nextTier.name ? 'tier' : 'level',
+        level: userGame.level,
+        tierName: nextTier.name,
+        tierColor: nextTier.color,
+        characterImage: nextTier.characterImage,
+        unlockedCount: Math.max(toUnlock.length, 1),
+      });
+    }
+  }, [userGame.level]);
 
-                    return (
-                      <line
-                        key={i}
-                        x1={src.x} y1={src.y} x2={tgt.x} y2={tgt.y}
-                        stroke="#ffffff"
-                        strokeWidth={edgeHighlighted ? edge.weight * 1.5 : 0.5}
-                        strokeOpacity={edgeDimmed ? 0.03 : edgeHighlighted ? 0.45 : 0.1}
-                        filter={edgeHighlighted ? 'url(#edge-glow)' : undefined}
-                        style={{ transition: 'stroke-opacity 0.25s' }}
-                      />
-                    );
-                  })}
+  // Watch for badge conditions
+  useEffect(() => {
+    const badge = checkBadges(userGame);
+    if (badge) {
+      setUserGame(prev => ({
+        ...prev,
+        badges: prev.badges.map(b => b.id === badge.id ? { ...b, earned: true, earnedAt: new Date().toLocaleDateString('ko-KR') } : b),
+      }));
+      setReward({ kind: 'badge', badge, tierColor: tierOf(userGame.level).color });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userGame.streak, userGame.totalNodesExplored, userGame.totalQuizzesSolved, userGame.scrapped.length, userGame.following]);
 
-                  {/* Nodes */}
-                  {allNodes.map((node) => {
-                    const p = positions.get(node.id);
-                    if (!p) return null;
-                    const r = nodeRadius(node.score);
-                    const color = nodeColor(node.persona);
-                    const isSelected = node.id === selectedNodeId;
-                    const dimmed = isDimmed(node.id);
-                    const highlighted = isHighlighted(node.id);
-                    const hovered = hoveredNodeId === node.id;
-                    const simNode = simNodesRef.current.find((s) => s.id === node.id)!;
+  // ── XP helper ─────────────────────────────────────────────────────────────────
 
-                    // 글로우 원 반지름 (blur로 자연스럽게 페이드)
-                    const glowR = r * 1.6;
-                    const coreR = Math.max(1, r * 0.2);
-                    // 히트 영역
-                    const hitR = Math.max(14, glowR);
+  function applyXp(prev: UserGame, xp: number): UserGame {
+    let newXp = prev.xp + xp;
+    let newLevel = prev.level;
+    while (newXp >= xpForLevel(newLevel)) {
+      newXp -= xpForLevel(newLevel);
+      newLevel++;
+    }
+    return { ...prev, xp: newXp, level: newLevel };
+  }
 
-                    return (
-                      <g key={node.id}
-                        onMouseEnter={() => setHoveredNodeId(node.id)}
-                        onMouseLeave={() => setHoveredNodeId(null)}
-                      >
-                        {/* 선택 시 외곽 후광 */}
-                        {isSelected && (
-                          <circle cx={p.x} cy={p.y} r={glowR * 1.8}
-                            fill={color} fillOpacity={0.25}
-                            filter="url(#node-glow-lg)"
-                            style={{ pointerEvents: 'none' }}
-                          />
-                        )}
+  // ── Callbacks from GraphScreen ────────────────────────────────────────────────
 
-                        {/* 메인 글로우 — blur 처리된 원 하나 → 중심에서 투명하게 퍼짐 */}
-                        <circle cx={p.x} cy={p.y} r={glowR}
-                          fill={color}
-                          fillOpacity={
-                            dimmed        ? 0.06
-                            : isSelected  ? 0.9
-                            : highlighted ? 0.75
-                            : hovered     ? 0.65
-                            :               0.5
-                          }
-                          filter="url(#node-glow)"
-                          style={{ transition: 'fill-opacity 0.2s', pointerEvents: 'none' }}
-                        />
+  const handleNodeExplore = useCallback((_nodeId: number, _nodeLabel: string) => {
+    setUserGame(prev => applyXp(
+      { ...prev, totalNodesExplored: prev.totalNodesExplored + 1 },
+      5,
+    ));
+  }, []);
 
-                        {/* 히트 영역 (투명, 넓게) */}
-                        <circle cx={p.x} cy={p.y} r={hitR}
-                          fill="transparent"
-                          style={{ cursor: 'grab' }}
-                          onPointerDown={(e) => onNodePointerDown(e, simNode)}
-                          onPointerUp={(e) => onNodePointerUp(e, node.id)}
-                        />
+  const handleScrap = useCallback((_nodeId: number, _nodeLabel: string) => {
+    setUserGame(prev => applyXp({
+      ...prev,
+      scrapped: prev.scrapped.includes(_nodeLabel) ? prev.scrapped : [...prev.scrapped, _nodeLabel],
+    }, 3));
+  }, []);
 
-                        {/* 밝은 흰 코어 점 */}
-                        <circle cx={p.x} cy={p.y} r={coreR}
-                          fill="#ffffff"
-                          fillOpacity={dimmed ? 0.15 : 1}
-                          filter="url(#core-glow)"
-                          style={{ transition: 'fill-opacity 0.2s', pointerEvents: 'none' }}
-                        />
+  const handleScrapChange = useCallback((item: ScrappedKeyword, scrapped: boolean) => {
+    setScrappedKeywords(prev => {
+      if (scrapped) {
+        if (prev.some(x => x.id === item.id)) return prev;
+        return [...prev, item];
+      }
+      return prev.filter(x => x.id !== item.id);
+    });
+  }, []);
 
-                        {/* 라벨 — 호버된 노드 + 인접 노드 + 선택된 노드에만 표시 */}
-                        {(isSelected || (hoverAdjacentIds !== null && hoverAdjacentIds.has(node.id))) && (
-                          <text
-                            x={p.x} y={p.y + glowR + 13}
-                            textAnchor="middle"
-                            fontSize={11}
-                            fill="#ffffff"
-                            fillOpacity={isSelected ? 1 : 0.9}
-                            fontWeight="500"
-                            letterSpacing="0.2"
-                            style={{ userSelect: 'none', pointerEvents: 'none' }}
-                          >
-                            {node.label}
-                          </text>
-                        )}
-                      </g>
-                    );
-                  })}
-                </g>
-              </svg>
-            )}
+  const handleQuizStart = useCallback((nodeLabel: string) => {
+    setQuizFor(nodeLabel);
+  }, []);
 
-            <button className={styles.recenterFab} onClick={handleRecenter} title="재중앙">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M3 12h3M18 12h3M12 3v3M12 18v3" />
-              </svg>
-            </button>
+  // ── Quiz complete ─────────────────────────────────────────────────────────────
 
-            <div className={styles.legend}>
-              {[
-                ['경제', '#ff9f0a'], ['정치', '#0a84ff'], ['기술', '#30d158'],
-                ['사회', '#bf5af2'], ['문화', '#ff453a'], ['국제', '#64d2ff'],
-              ].map(([label, color]) => (
-                <div key={label} className={styles.legendItem}>
-                  <span className={styles.legendDot} style={{ background: color, boxShadow: `0 0 5px 1px ${color}` }} />
-                  <span>{label}</span>
-                </div>
-              ))}
-            </div>
-          </>
+  const handleQuizComplete = useCallback((result: {
+    correctCount: number; xpGained: number; nodeId: string;
+  }) => {
+    setQuizFor(null);
+
+    const willCompleteGoal = userGame.dailyProgress + 1 >= userGame.dailyGoal;
+    const bonusXp = willCompleteGoal && !receiptShownToday ? 50 : 0;
+
+    setUserGame(prev => {
+      const updated = applyXp(
+        {
+          ...prev,
+          totalQuizzesSolved: prev.totalQuizzesSolved + result.correctCount,
+          dailyProgress: Math.min(prev.dailyProgress + 1, prev.dailyGoal),
+          completedQuizzes: [...prev.completedQuizzes, result.nodeId],
+        },
+        result.xpGained + bonusXp,
+      );
+      return updated;
+    });
+
+    if (willCompleteGoal && !receiptShownToday) {
+      setReceiptShownToday(true);
+      setReceipt({
+        date: new Date().toLocaleDateString('ko-KR'),
+        username: '딩고',
+        synapseFrom: result.nodeId,
+        synapseTo: '지식',
+        serial: `NDG-${Date.now().toString().slice(-8)}`,
+      });
+    }
+  }, [userGame.dailyProgress, userGame.dailyGoal, receiptShownToday]);
+
+  const tier = tierOf(userGame.level);
+
+  return (
+    <div className="nodingo-stage">
+      <div className="nodingo-device">
+        <div className="nodingo-dynamic-island" />
+        <div className="nodingo-statusbar">
+          <span>9:41</span>
+          <span className="nodingo-system-icons">
+            <svg width="19" height="12" viewBox="0 0 19 12">
+              <rect x="0" y="7.5" width="3.2" height="4.5" rx="0.7" fill="currentColor"/>
+              <rect x="4.8" y="5" width="3.2" height="7" rx="0.7" fill="currentColor"/>
+              <rect x="9.6" y="2.5" width="3.2" height="9.5" rx="0.7" fill="currentColor"/>
+              <rect x="14.4" y="0" width="3.2" height="12" rx="0.7" fill="currentColor"/>
+            </svg>
+            <svg width="17" height="12" viewBox="0 0 17 12">
+              <path d="M8.5 3.2C10.8 3.2 12.9 4.1 14.4 5.6L15.5 4.5C13.7 2.7 11.2 1.5 8.5 1.5C5.8 1.5 3.3 2.7 1.5 4.5L2.6 5.6C4.1 4.1 6.2 3.2 8.5 3.2Z" fill="currentColor"/>
+              <path d="M8.5 6.8C9.9 6.8 11.1 7.3 12 8.2L13.1 7.1C11.8 5.9 10.2 5.1 8.5 5.1C6.8 5.1 5.2 5.9 3.9 7.1L5 8.2C5.9 7.3 7.1 6.8 8.5 6.8Z" fill="currentColor"/>
+              <circle cx="8.5" cy="10.5" r="1.5" fill="currentColor"/>
+            </svg>
+            <svg width="27" height="13" viewBox="0 0 27 13">
+              <rect x="0.5" y="0.5" width="23" height="12" rx="3.5" stroke="currentColor" strokeOpacity="0.35" fill="none"/>
+              <rect x="2" y="2" width="20" height="9" rx="2" fill="currentColor"/>
+              <path d="M25 4.5V8.5C25.8 8.2 26.5 7.2 26.5 6.5C26.5 5.8 25.8 4.8 25 4.5Z" fill="currentColor" fillOpacity="0.4"/>
+            </svg>
+          </span>
+        </div>
+        <div style={{
+          position: 'relative',
+          display: 'flex', flexDirection: 'column',
+          height: '100%',
+          background: '#FFFFFF',
+          color: '#0F1115',
+          overflow: 'hidden',
+          fontFamily: 'Pretendard, -apple-system, system-ui, sans-serif',
+        }}>
+      {/* Fixed HUD */}
+      <HUD userGame={userGame} onProfileTap={() => setTab('profile')} />
+
+      {/* Page content - pushed below HUD and above BottomNav */}
+      <div style={{
+        flex: 1,
+        marginTop: 'calc(var(--nodingo-status-offset, 0px) + 82px)',
+        marginBottom: 86,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+      }}>
+        {tab === 'graph' && (
+          <GraphScreen
+            userGame={userGame}
+            unlockingNodes={unlockingNodes}
+            forceMock={forceMock}
+            onNodeExplore={handleNodeExplore}
+            onScrap={handleScrap}
+            onScrapChange={handleScrapChange}
+            onQuizStart={handleQuizStart}
+          />
         )}
-
-        {activeTab === 'scrap' && (
-          scrappedNodes.size === 0 ? (
-            <div className={styles.emptyState}>
-              <p>스크랩한 키워드가 없어요</p>
-              <p className={styles.emptyHint}>그래프에서 노드를 스크랩해보세요</p>
-            </div>
-          ) : (
-            <div className={styles.scrapList}>
-              {[...scrappedNodes.values()].map((node) => (
-                <div key={node.id} className={styles.scrapCard}>
-                  <div className={styles.scrapCardHeader}>
-                    <div className={styles.scrapCardLabel}>
-                      <span className={styles.scrapCardDot} style={{ background: nodeColor(node.persona) }} />
-                      <span className={styles.scrapCardWord}>{node.label}</span>
-                      <span className={styles.scrapCardPersona}>{node.persona}</span>
-                    </div>
-                    <button className={styles.unscrapBtn} onClick={() => scrapMutation.mutate(node)}>해제</button>
-                  </div>
-                  <p className={styles.scrapCardSummary}>{node.summary}</p>
-                </div>
-              ))}
-            </div>
-          )
+        {tab === 'scrap' && (
+          <ScrapScreen
+            items={scrappedKeywords}
+            onOpen={(item) => {
+              setTab('graph');
+              void item;
+              setTimeout(() => setQuizFor(null), 0);
+            }}
+          />
         )}
-
-        {activeTab === 'feed' && (
-          <div className={styles.emptyState}><p>피드 준비 중</p></div>
+        {tab === 'ranking' && (
+          <RankingScreen accentColor={tier.color} userGame={userGame} />
         )}
-
-        {activeTab === 'profile' && (
-          <div className={styles.profileTab}>
-            <div className={styles.profileCard}>
-              <div className={styles.profileAvatar}>N</div>
-              <p className={styles.profileName}>Nodingo 사용자</p>
-              <button className={styles.profileLogout} onClick={logout}>로그아웃</button>
-            </div>
-          </div>
+        {tab === 'profile' && (
+          <ProfileScreen userGame={userGame} />
         )}
-      </main>
+      </div>
 
-      <BottomNav active={activeTab} onChange={setActiveTab} />
+      {/* Bottom Nav */}
+      <BottomNav
+        active={tab}
+        onChange={setTab}
+        accentColor={tier.color}
+      />
 
-      {/* Node detail sheet */}
-      <BottomSheet
-        open={sheetOpen}
-        onClose={() => setSheetOpen(false)}
-        title={summaryLoading ? '로딩 중...' : (nodeSummary?.word ?? '')}
-      >
-        {summaryLoading ? (
-          <div className={styles.sheetLoader}><div className={styles.spinner} /></div>
-        ) : nodeSummary ? (
-          <div className={styles.sheetContent}>
-            <div className={styles.sheetMeta}>
-              <span className={styles.sheetPersona}>{nodeSummary.persona}</span>
-              <button
-                className={`${styles.scrapBtn} ${scrappedNodes.has(selectedNodeId!) ? styles.scrapBtnActive : ''}`}
-                onClick={() => scrapMutation.mutate({
-                  id: selectedNodeId!,
-                  label: nodeSummary.word,
-                  persona: nodeSummary.persona,
-                  summary: nodeSummary.summary,
-                })}
-              >
-                <svg viewBox="0 0 24 24" fill={scrappedNodes.has(selectedNodeId!) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" width="14" height="14">
-                  <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
-                </svg>
-                {scrappedNodes.has(selectedNodeId!) ? '스크랩됨' : '스크랩'}
-              </button>
-            </div>
-            <p className={styles.sheetSummary}>{nodeSummary.summary}</p>
-          </div>
-        ) : (
-          <p className={styles.sheetEmpty}>요약 정보가 없습니다.</p>
-        )}
-      </BottomSheet>
+      {/* Overlays */}
+      {quizFor && (
+        <QuizModal
+          nodeId={quizFor}
+          nodeLabel={quizFor}
+          accent={tier.color}
+          onClose={() => setQuizFor(null)}
+          onComplete={handleQuizComplete}
+        />
+      )}
+      {receipt && (
+        <ReceiptModal
+          data={receipt}
+          onClose={() => setReceipt(null)}
+        />
+      )}
+      <RewardPopup
+        reward={reward}
+        onClose={() => setReward(null)}
+      />
+        </div>
+        <div className="nodingo-home-indicator" />
+      </div>
     </div>
   );
 }
