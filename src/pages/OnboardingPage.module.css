@@ -1,14 +1,17 @@
+/* 메인 앱(그래프)과 동일한 무드: 따뜻한 크림 배경 + 초록 강조 + 소프트 라운드 */
 .page {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  background-color: var(--color-canvas);
+  background-color: #FAF7F1;
+  font-family: Pretendard, -apple-system, system-ui, sans-serif;
+  color: #0F1115;
 }
 
 /* Progress */
 .progressBar {
-  height: 3px;
-  background-color: var(--color-hairline);
+  height: 4px;
+  background-color: #EFEEEA;
   position: sticky;
   top: 0;
   z-index: 10;
@@ -16,8 +19,9 @@
 
 .progressFill {
   height: 100%;
-  background-color: var(--color-primary);
-  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  background-color: #5BBA6F;
+  border-radius: 999px;
+  transition: width 0.45s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 /* Header */
@@ -35,28 +39,69 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  color: var(--color-ink);
-  transition: background-color var(--transition-fast);
+  color: #0F1115;
+  transition: background-color 150ms ease;
   background: none;
   border: none;
   cursor: pointer;
 }
 
 .backBtn:hover {
-  background-color: var(--color-parchment);
+  background-color: #F4F4F0;
 }
 
 .stepIndicator {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 800;
+  color: #6B6B66;
   margin-left: auto;
+  background: #F4F4F0;
+  padding: 4px 11px;
+  border-radius: 999px;
+}
+
+/* 딩고 한마디 배너 */
+.dingo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #E5F4E0;
+  border-radius: 16px;
+  padding: 10px 14px;
+  margin-bottom: 18px;
+}
+
+.dingoFace {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(15, 17, 21, 0.08);
+}
+
+.dingoFace img {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.dingoMsg {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1E8460;
+  line-height: 1.4;
 }
 
 /* Content */
 .content {
   flex: 1;
-  padding: 32px 20px 100px;
+  padding: 24px 20px 110px;
   display: flex;
   flex-direction: column;
   max-width: 600px;
@@ -65,60 +110,64 @@
 }
 
 .title {
-  font-size: clamp(22px, 5vw, 28px);
-  font-weight: 700;
-  letter-spacing: -0.5px;
-  color: var(--color-ink);
+  font-size: clamp(23px, 5vw, 29px);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: #0F1115;
   margin-bottom: 8px;
   line-height: 1.3;
 }
 
 .sub {
   font-size: 14px;
-  color: var(--color-muted);
-  margin-bottom: 32px;
+  font-weight: 600;
+  color: #6B6B66;
+  margin-bottom: 26px;
 }
 
 /* Card grid (persona / macro) */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 12px;
 }
 
 .card {
   position: relative;
-  padding: 20px 16px;
-  background-color: var(--color-parchment);
-  border: 2px solid transparent;
-  border-radius: var(--radius-md);
+  padding: 18px 16px;
+  background-color: #FFFFFF;
+  border: 2px solid #EFEEEA;
+  border-radius: 20px;
   cursor: pointer;
   text-align: left;
-  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+  box-shadow: 0 2px 8px rgba(15, 17, 21, 0.04);
+  transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
 .card:hover {
-  background-color: rgba(0, 102, 204, 0.05);
-  border-color: rgba(0, 102, 204, 0.2);
+  transform: translateY(-2px);
+  border-color: #D7E8CE;
 }
 
+/* macro 단계 선택 색 (초록) — persona 단계는 JSX 인라인으로 파스텔 지정 */
 .selected {
-  background-color: rgba(0, 102, 204, 0.08) !important;
-  border-color: var(--color-primary) !important;
+  background-color: #E5F4E0 !important;
+  border-color: #5BBA6F !important;
 }
 
 .cardLabel {
   font-size: 16px;
-  font-weight: 600;
-  color: var(--color-ink);
+  font-weight: 800;
+  color: #0F1115;
 }
 
 .cardDesc {
   font-size: 12px;
-  color: var(--color-muted);
+  font-weight: 500;
+  color: #6B6B66;
   line-height: 1.5;
 }
 
@@ -127,8 +176,8 @@
   top: 10px;
   right: 12px;
   font-size: 14px;
-  color: var(--color-primary);
-  font-weight: 700;
+  color: #5BBA6F;
+  font-weight: 900;
 }
 
 /* Chip grid (specific) */
@@ -141,25 +190,27 @@
 
 .chip {
   padding: 10px 18px;
-  background-color: var(--color-parchment);
-  border: 1.5px solid transparent;
-  border-radius: var(--radius-pill);
+  background-color: #FFFFFF;
+  border: 1.5px solid #EFEEEA;
+  border-radius: 9999px;
   font-size: 14px;
-  font-weight: 500;
-  color: var(--color-ink);
+  font-weight: 700;
+  color: #4A4C50;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  box-shadow: 0 1px 3px rgba(15, 17, 21, 0.03);
+  transition: all 150ms ease;
 }
 
 .chip:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
+  border-color: #5BBA6F;
+  color: #1E8460;
 }
 
 .chipSelected {
-  background-color: rgba(0, 102, 204, 0.1);
-  border-color: var(--color-primary);
-  color: var(--color-primary);
+  background-color: #E5F4E0;
+  border-color: #5BBA6F;
+  color: #1E8460;
+  font-weight: 800;
 }
 
 /* Footer buttons */
@@ -170,55 +221,62 @@
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 16px 20px env(safe-area-inset-bottom);
-  background-color: var(--color-canvas);
-  border-top: 1px solid var(--color-hairline);
+  padding: 16px 20px calc(16px + env(safe-area-inset-bottom));
+  background-color: #FAF7F1;
+  border-top: 1px solid #EFEEEA;
 }
 
 .skipBtn {
   flex: 1;
   height: 52px;
-  border: 1.5px solid var(--color-hairline);
-  border-radius: var(--radius-pill);
-  background: none;
+  border: 1.5px solid #E6E6E2;
+  border-radius: 16px;
+  background: #FFFFFF;
   font-size: 15px;
-  font-weight: 600;
-  color: var(--color-muted);
+  font-weight: 800;
+  color: #6B6B66;
   cursor: pointer;
   font-family: inherit;
-  transition: border-color var(--transition-fast), color var(--transition-fast);
+  transition: border-color 150ms ease, color 150ms ease;
 }
 
 .skipBtn:hover {
-  border-color: var(--color-ink);
-  color: var(--color-ink);
+  border-color: #0F1115;
+  color: #0F1115;
 }
 
 .nextBtn {
   flex: 2;
   height: 52px;
-  background-color: var(--color-primary);
+  background-color: #5BBA6F;
   color: #fff;
   border: none;
-  border-radius: var(--radius-pill);
+  border-radius: 16px;
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 800;
   cursor: pointer;
   font-family: inherit;
-  transition: opacity var(--transition-fast);
+  box-shadow: 0 4px 0 #418550;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.nextBtn:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #418550;
 }
 
 .nextDisabled {
   opacity: 0.4;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 /* Loader */
 .loader {
   width: 36px;
   height: 36px;
-  border: 2.5px solid var(--color-hairline);
-  border-top-color: var(--color-primary);
+  border: 2.5px solid #EFEEEA;
+  border-top-color: #5BBA6F;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
   margin: 48px auto;
@@ -235,33 +293,63 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 32px;
+  gap: 26px;
   padding: 40px;
 }
 
-.loadingGraph {
-  width: 180px;
-  height: 180px;
+/* 딩고 캐릭터 + 펄스 링 */
+.loadingCharacter {
+  position: relative;
+  width: 168px;
+  height: 168px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.loadingSvg {
+.loadingRing {
+  position: absolute;
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  border: 2px solid #5BBA6F;
+  animation: ringPulse 1.9s ease-out infinite;
+}
+
+.loadingRing.delay {
+  animation-delay: 0.95s;
+}
+
+@keyframes ringPulse {
+  0%   { transform: scale(0.82); opacity: 0.55; }
+  100% { transform: scale(1.3); opacity: 0; }
+}
+
+.loadingFace {
+  width: 124px;
+  height: 124px;
+  border-radius: 50%;
+  background: #E5F4E0;
+  border: 3px solid #5BBA6F;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 56px;
+  z-index: 1;
+  box-shadow: 0 10px 26px rgba(91, 186, 111, 0.22);
+}
+
+.loadingFace img {
   width: 100%;
   height: 100%;
-}
-
-.pulseNode {
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 0.5; r: initial; }
-  50% { opacity: 1; }
+  object-fit: cover;
 }
 
 .loadingMsg {
   font-size: 16px;
-  font-weight: 500;
-  color: var(--color-muted);
+  font-weight: 600;
+  color: #6B6B66;
   animation: fadeInOut 1.4s ease-in-out infinite;
 }
 

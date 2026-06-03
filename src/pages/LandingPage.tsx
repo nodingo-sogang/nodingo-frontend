@@ -10,7 +10,17 @@ export default function LandingPage() {
 
       {/* Hero */}
       <section className={styles.hero}>
-        <span className={styles.badge}>GraphRAG 기반 뉴스 분석</span>
+        <span className={styles.dingoMascot}>
+          <img
+            src="/assets/characters/tier1_새내기.png"
+            alt="딩고"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = 'none';
+              (e.currentTarget.parentElement as HTMLElement).textContent = '🐦';
+            }}
+          />
+        </span>
+        <span className={styles.badge}>🌱 GraphRAG 기반 뉴스 분석</span>
         <h1 className={styles.heroTitle}>
           뉴스를 연결하면<br />
           <span className={styles.highlight}>진실이 보입니다</span>
@@ -33,8 +43,8 @@ export default function LandingPage() {
           <svg viewBox="0 0 360 280" className={styles.mockupSvg}>
             <defs>
               <radialGradient id="glow" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stopColor="#0066cc" stopOpacity="0.15" />
-                <stop offset="100%" stopColor="#0066cc" stopOpacity="0" />
+                <stop offset="0%" stopColor="#5BBA6F" stopOpacity="0.16" />
+                <stop offset="100%" stopColor="#5BBA6F" stopOpacity="0" />
               </radialGradient>
             </defs>
             <ellipse cx="180" cy="140" rx="160" ry="120" fill="url(#glow)" />
@@ -45,21 +55,21 @@ export default function LandingPage() {
               [180, 140, 300, 140],
             ].map(([x1, y1, x2, y2], i) => (
               <line key={i} x1={x1} y1={y1} x2={x2} y2={y2}
-                stroke="#0066cc" strokeWidth="1" strokeOpacity="0.25" />
+                stroke="#5BBA6F" strokeWidth="1.2" strokeOpacity="0.3" />
             ))}
             {/* Center node */}
-            <circle cx="180" cy="140" r="28" fill="#0066cc" fillOpacity="0.12" stroke="#0066cc" strokeWidth="2" />
-            <text x="180" y="136" textAnchor="middle" fontSize="11" fill="#0066cc" fontWeight="700">경제</text>
-            <text x="180" y="150" textAnchor="middle" fontSize="9" fill="#0066cc">금리</text>
-            {/* Outer nodes */}
+            <circle cx="180" cy="140" r="28" fill="#5BBA6F" fillOpacity="0.16" stroke="#5BBA6F" strokeWidth="2" />
+            <text x="180" y="136" textAnchor="middle" fontSize="11" fill="#1E8460" fontWeight="800">경제</text>
+            <text x="180" y="150" textAnchor="middle" fontSize="9" fill="#1E8460">금리</text>
+            {/* Outer nodes — 메인 그래프 페르소나 파스텔 */}
             {[
-              [90, 80, '#30d158', '한국은행'],
-              [270, 80, '#ff9f0a', '기준금리'],
-              [90, 200, '#bf5af2', '물가'],
-              [270, 200, '#ff453a', '환율'],
-              [180, 50, '#0a84ff', '통화정책'],
-              [60, 140, '#30d158', '수출'],
-              [300, 140, '#ff9f0a', '부동산'],
+              [90, 80, '#F1B45E', '한국은행'],
+              [270, 80, '#7BCF91', '기준금리'],
+              [90, 200, '#B996EA', '물가'],
+              [270, 200, '#7CCFDC', '환율'],
+              [180, 50, '#7CB5F4', '통화정책'],
+              [60, 140, '#F08C8C', '수출'],
+              [300, 140, '#F1B45E', '부동산'],
             ].map(([cx, cy, fill, label], i) => (
               <g key={i}>
                 <circle cx={cx as number} cy={cy as number} r="18"
