@@ -7,7 +7,7 @@ import styles from './LoginPage.module.css';
 const IS_DEV = import.meta.env.DEV;
 
 export default function LoginPage() {
-  const { isAuthenticated, isOnboarded, login } = useAuthStore();
+  const { isAuthenticated, isOnboarded } = useAuthStore();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -21,8 +21,9 @@ export default function LoginPage() {
   };
 
   const handleDevLogin = () => {
-    login('dev-token', 'dev-refresh', true);
-    navigate('/graph', { replace: true });
+    // mock 데이터 미리보기. /preview 는 forceMock 라우트라 실 백엔드를 호출하지 않음.
+    // (가짜 토큰을 set 하면 /graph 가 실 API 401 → 토큰 갱신 실패 → /login 으로 튕김)
+    navigate('/preview');
   };
 
   return (
