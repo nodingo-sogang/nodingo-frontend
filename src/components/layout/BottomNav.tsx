@@ -6,7 +6,7 @@ interface BottomNavProps {
   accentColor?: string;
 }
 
-const TABS: { id: BottomNavTab; label: string; icon: React.ReactNode }[] = [
+export const NAV_TABS: { id: BottomNavTab; label: string; icon: React.ReactNode }[] = [
   {
     id: 'graph',
     label: '그래프',
@@ -67,7 +67,7 @@ export default function BottomNav({ active, onChange, accentColor }: BottomNavPr
       borderTop: '1px solid rgba(15,17,21,0.06)',
       display: 'flex',
     }}>
-      {TABS.map((tab) => {
+      {NAV_TABS.map((tab) => {
         const isActive = active === tab.id;
         return (
           <button key={tab.id} onClick={() => onChange(tab.id)} style={{

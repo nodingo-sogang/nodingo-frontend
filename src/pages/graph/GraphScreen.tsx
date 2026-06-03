@@ -145,6 +145,8 @@ interface GraphScreenProps {
   onScrap: (nodeId: number, nodeLabel: string) => void;
   onScrapChange?: (item: ScrappedNode, scrapped: boolean) => void;
   onQuizStart: (keywordId: number, nodeLabel: string) => void;
+  /** 데스크톱 레이아웃: 노드 상세를 바텀시트 대신 우측 패널로 표시 */
+  isDesktop?: boolean;
 }
 
 export default function GraphScreen({
@@ -155,6 +157,7 @@ export default function GraphScreen({
   onScrap,
   onScrapChange,
   onQuizStart,
+  isDesktop = false,
 }: GraphScreenProps) {
   const [isLiveData, setIsLiveData] = useState(false);
   const [highlightKeywordId, setHighlightKeywordId] = useState<number | null>(null);
@@ -820,8 +823,8 @@ export default function GraphScreen({
 
         <button onClick={() => setTransform({ x: 0, y: 0, scale: 1 })} title="재중앙" style={{
           position: 'absolute',
-          right: 16,
-          bottom: sheetOpen ? 430 : 148,
+          right: isDesktop ? (sheetOpen ? 416 : 16) : 16,
+          bottom: isDesktop ? 24 : (sheetOpen ? 430 : 148),
           width: 44,
           height: 44,
           borderRadius: '50%',
@@ -864,7 +867,20 @@ export default function GraphScreen({
         )}
 
         {sheetOpen && (
-          <div style={{
+          <div style={isDesktop ? {
+            // 데스크톱: 우측 고정 상세 패널
+            position: 'absolute',
+            top: 0, right: 0, bottom: 0,
+            width: 400,
+            background: '#FFFFFF',
+            borderLeft: '1px solid #EFEEEA',
+            boxShadow: '-16px 0 38px rgba(15,17,21,0.10)',
+            display: 'flex', flexDirection: 'column',
+            overflow: 'hidden',
+            zIndex: 70,
+            animation: 'nodingo-panel-in 320ms cubic-bezier(.2,.7,.2,1)',
+          } : {
+            // 모바일: 바텀시트
             position: 'absolute',
             left: 0, right: 0, bottom: 0,
             height: 332,
