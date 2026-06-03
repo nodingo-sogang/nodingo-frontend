@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { userApi } from '../api/user';
@@ -19,6 +19,10 @@ export default function OnboardingPage() {
   const [selectedMacro, setSelectedMacro] = useState<KeywordResponse | null>(null);
   const [selectedSpecific, setSelectedSpecific] = useState<number[]>([]);
   const [loadingMsg, setLoadingMsg] = useState('관심사를 분석하는 중...');
+  // 온보딩 제출 완료(202) 여부 → 상태 폴링 시작 트리거
+  const [submitted, setSubmitted] = useState(false);
+  // 백엔드 추천 생성이 끝나(또는 폴백 타임아웃) 입장 준비됨
+  const [ready, setReady] = useState(false);
 
   const stepIndex = { persona: 0, macro: 1, specific: 2, loading: 3 };
   const progress = (stepIndex[step] / 3) * 100;
@@ -67,11 +71,47 @@ export default function OnboardingPage() {
           specific_keyword_ids: selectedSpecific,
         },
       }).catch(() => null), // 백엔드 없어도 진행
-    onSettled: () => {
-      setOnboarded();
-      navigate('/graph', { replace: true });
+    // 제출(202) 후 바로 이동하지 않고, 상태 폴링을 시작해 추천 생성이 끝날 때까지 대기
+    onSettled: () => setSubmitted(true),
+  });
+
+  // 온보딩 처리 상태 폴링 (PENDING → COMPLETED). 추천 생성이 끝날 때까지 기다린다.
+  const { data: onboardingStatus } = useQuery({
+    queryKey: ['onboardingStatus'],
+    queryFn: () =>
+      userApi.getOnboardingStatus().then((r) => r.data.data).catch(() => null),
+    enabled: submitted && !ready,
+    refetchInterval: (query) => {
+      const s = query.state.data?.status;
+      return s === 'COMPLETED' ? false : 2500;
     },
   });
+
+  // 상태 결과에 따라 입장 준비 처리
+  useEffect(() => {
+    if (!submitted || ready) return;
+    // 백엔드 추적 불가(mock/미배포): 잠깐 보여주고 입장 허용
+    if (onboardingStatus === null) {
+      const t = setTimeout(() => setReady(true), 2500);
+      return () => clearTimeout(t);
+    }
+    // COMPLETED(또는 FAILED)면 입장 준비 완료
+    if (onboardingStatus?.status === 'COMPLETED' || (onboardingStatus?.status as string) === 'FAILED') {
+      setReady(true);
+    }
+  }, [onboardingStatus, submitted, ready]);
+
+  // 하드 캡: 어떤 경우든 20초 후엔 입장 허용 (무한 대기 방지)
+  useEffect(() => {
+    if (!submitted || ready) return;
+    const t = setTimeout(() => setReady(true), 20000);
+    return () => clearTimeout(t);
+  }, [submitted, ready]);
+
+  const enterMain = () => {
+    setOnboarded();
+    navigate('/graph', { replace: true });
+  };
 
   const handlePersonaSelect = (persona: UserPersona) => {
     setSelectedPersona(persona);
@@ -324,7 +364,37 @@ export default function OnboardingPage() {
               ))}
             </svg>
           </div>
-          <p className={styles.loadingMsg}>{loadingMsg}</p>
+          {ready ? (
+            <>
+              <p
+                className={styles.loadingMsg}
+                style={{ animation: 'none', color: '#0F1115', fontWeight: 800, fontSize: 18 }}
+              >
+                딩고의 지식지도가 준비됐어요! 🎉
+              </p>
+              <button
+                onClick={enterMain}
+                style={{
+                  marginTop: 22,
+                  padding: '15px 44px',
+                  borderRadius: 16,
+                  border: 'none',
+                  background: '#0066cc',
+                  color: '#fff',
+                  fontSize: 16,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 6px 16px rgba(0,102,204,0.28)',
+                  fontFamily: 'inherit',
+                  animation: 'nodingo-modal-in 280ms ease both',
+                }}
+              >
+                시작하기 →
+              </button>
+            </>
+          ) : (
+            <p className={styles.loadingMsg}>{loadingMsg}</p>
+          )}
         </div>
       )}
     </div>
