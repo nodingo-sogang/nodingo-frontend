@@ -164,13 +164,51 @@ if (recommendKeywordRepository.existsByUserIdAndTargetDate(user.getId(), today))
 
 ---
 
-## 4. ⚪ (후순위/선택) 소셜 기능 — 기획 확정 시 요청
+## 4. 👥 친구 (초대 코드 방식) — 신규 요청
 
-랭킹 화면에 UI는 있으나 발표용 미리보기 상태. 실제 동작시키려면 필요.
+**화면:** 랭킹 "친구" 탭. 현재 **친구를 맺는 경로가 전혀 없음**(검색 UI 없음, 전부 mock).
+**방식:** 유저 검색·고유 닉네임 인프라 없이 **초대 코드**로 연결. (네이버 OAuth는 인증만 제공하고 친구 그래프를 안 줘서 자체 구현 필요)
+**모델:** 양방향 친구 — A가 B의 코드를 입력하면 서로 친구. 코드는 유저당 1개 고정.
 
-- **툭 건들기(poke):** `POST /api/users/{userId}/poke` → 알림 발송
-- **타 유저 지식지도:** `GET /api/users/{userId}/graph` → 그래프 노드/엣지 (본인 그래프 조회와 동일 형태)
-- **팔로우:** `POST` · `DELETE /api/users/{userId}/follow`
+### 4-1. 내 초대 코드 조회
+| Method | Path |
+|---|---|
+| `GET` | `/api/users/me/invite-code` |
+
+```json
+{ "invite_code": "NDG-7F3A" }
+```
+- 없으면 생성 후 반환, 재호출 시 동일 코드(고정).
+
+### 4-2. 초대 코드로 친구 추가
+| Method | Path | Body |
+|---|---|---|
+| `POST` | `/api/users/friends` | `{ "invite_code": "NDG-7F3A" }` |
+
+```json
+{ "user_id": 12, "name": "찬우", "level": 8, "persona": "기술" }
+```
+- 양방향 친구 생성(A↔B 동시). 에러: `404`(코드 없음) / `409`(이미 친구) / `400`(내 코드)
+
+### 4-3. 내 친구 목록
+| Method | Path |
+|---|---|
+| `GET` | `/api/users/friends` |
+
+```json
+{ "friends": [ { "user_id": 12, "name": "찬우", "level": 8, "persona": "기술" } ] }
+```
+
+### 4-4. 친구 삭제 (선택)
+`DELETE /api/users/friends/{userId}`
+
+### 4-5. 친구 랭킹 연동
+- 위 친구 관계를 기준으로 **`GET /api/users/ranking?scope=friends`(1-1)** 가 친구들만 반환
+- → "나" 행도 서버값이 되어 사이드바 레벨과 일치(현재는 mock이라 Lv 불일치)
+
+### (선택) 부가 소셜
+- **툭 건들기(poke):** `POST /api/users/{userId}/poke` → 알림 (랭킹 👋 버튼)
+- **타 유저 지식지도:** `GET /api/users/{userId}/graph` → 그래프 (본인 그래프와 동일 형태, 랭킹 "지식지도 보기")
 
 ---
 
@@ -178,4 +216,4 @@ if (recommendKeywordRepository.existsByUserIdAndTargetDate(user.getId(), today))
 1. **랭킹(1-1)** — 화면 전체가 mock이라 임팩트 큼
 2. **뱃지(1-2)** + **game 확장(2-1)** — 프로필 화면 완성
 3. 스크랩 목록(3) 연결 — 프론트 작업 (백엔드 불필요)
-4. 소셜(4) — 기획 확정 후
+4. 친구 초대코드(4) — 백엔드 소셜 API 합의 후 (프론트 친구추가 UI 동반 필요)
