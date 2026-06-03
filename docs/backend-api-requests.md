@@ -55,6 +55,26 @@ if (recommendKeywordRepository.existsByUserIdAndTargetDate(user.getId(), today))
 
 ---
 
+## 🚀 D. 배포(Vercel) 연동 — 로그인 살리기
+
+프론트가 **Vercel에 배포**됐습니다: `https://nodingo-frontend-plum.vercel.app`
+- **API 호출(CORS):** 프론트 `vercel.json`에서 `/api/*`를 백엔드로 **서버사이드 프록시**합니다. → 브라우저 기준 same-origin이라 **CORS 변경 불필요.** (백엔드 직접 호출이 없음)
+- **OAuth 콜백(네이버):** 네이버 등록 콜백은 백엔드 도메인(`{backend}/login/oauth2/code/naver`) 그대로라 **네이버 콘솔 변경 불필요.**
+
+### D-1. 🔴 OAuth 성공 후 리다이렉트 주소 변경 (유일한 필수 변경)
+현재 `app.oauth2.redirect-uri`가 백엔드 자기 페이지(`/auth/callback.html`)를 가리켜서, 배포된 프론트로 토큰이 안 돌아옵니다. `OAuth2SuccessHandler`가 `redirect-uri?accessToken=..&refreshToken=..`로 보내므로, **이 값만 배포 프론트의 콜백 라우트로** 바꾸면 됩니다:
+
+```yaml
+# application.yaml (또는 배포 환경변수 APP_OAUTH2_REDIRECT_URI)
+app:
+  oauth2:
+    redirect-uri: https://nodingo-frontend-plum.vercel.app/auth/callback
+```
+- 프론트 `/auth/callback`(React 라우트)이 `accessToken`/`refreshToken` 쿼리를 읽어 로그인 처리함 → **이 한 줄이면 배포본 로그인 동작.**
+- (로컬 개발도 같이 쓰려면 환경별로 분기: dev=`http://localhost:3000/auth/callback`, prod=Vercel 주소)
+
+---
+
 ## 1. 🔴 신규 요청 — 현재 백엔드에 없음
 
 ### 1-1. 랭킹(리더보드) 조회
