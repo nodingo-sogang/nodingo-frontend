@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import type { CSSProperties } from 'react';
-import { useQuery, useQueries, useMutation } from '@tanstack/react-query';
+import { useQuery, useQueries, useMutation, useInfiniteQuery } from '@tanstack/react-query';
 import {
   forceSimulation, forceLink, forceManyBody,
   forceCenter, forceCollide, forceX, forceY,
@@ -286,18 +286,45 @@ export default function GraphScreen({
     };
   }, [allNodes, allEdges]);
 
-  const { data: nodeSummary, isLoading: summaryLoading } = useQuery<NodeSummaryResponse | null>({
+  // 노드 요약 + 관련 뉴스 (뉴스 무한 스크롤 페이징)
+  const mockSummaryPage = useCallback((): NodeSummaryResponse | null => {
+    if (selectedNodeId === null) return null;
+    const m = MOCK_SUMMARIES[selectedNodeId];
+    return m ? { ...m, has_next: false } : null;
+  }, [selectedNodeId]);
+
+  const {
+    data: summaryPages,
+    isLoading: summaryLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['nodeSummary', selectedNodeId],
-    queryFn: async () => {
-      if (!selectedNodeId) return null;
-      if (forceMock) return MOCK_SUMMARIES[selectedNodeId] ?? null;
-      return graphApi.getNodeSummary(selectedNodeId)
+    queryFn: async ({ pageParam }) => {
+      if (forceMock) return mockSummaryPage();
+      return graphApi.getNodeSummary(selectedNodeId as number, pageParam)
         .then(r => r.data.data)
-        .catch(() => MOCK_SUMMARIES[selectedNodeId] ?? null);
+        .catch(() => mockSummaryPage());
     },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage?.has_next ? allPages.length : undefined,
     enabled: selectedNodeId !== null && sheetOpen,
-    placeholderData: selectedNodeId !== null ? (MOCK_SUMMARIES[selectedNodeId] ?? null) : null,
   });
+
+  // 요약 본문/제목은 첫 페이지 기준, 뉴스는 모든 페이지 누적(중복 id 제거)
+  const nodeSummary: NodeSummaryResponse | null = summaryPages?.pages[0] ?? null;
+  const accumulatedNews = useMemo<NewsItemBrief[]>(() => {
+    const seen = new Set<number>();
+    const list: NewsItemBrief[] = [];
+    for (const page of summaryPages?.pages ?? []) {
+      for (const item of page?.news ?? []) {
+        if (!seen.has(item.id)) { seen.add(item.id); list.push(item); }
+      }
+    }
+    return list;
+  }, [summaryPages]);
 
   // ── Scrap mutation ────────────────────────────────────────────────────────────
 
@@ -339,6 +366,15 @@ export default function GraphScreen({
     const key = LABEL_TO_LOCK_KEY[node.label] ?? node.label.toLowerCase().replace(/[\s-]+/g, '');
     return unlockingNodes.has(key);
   }, [unlockingNodes]);
+
+  // 그래프 "내용"이 실제로 바뀔 때만 시뮬레이션을 다시 돌리기 위한 안정 키.
+  // useQueries(v5)가 매 렌더 새 배열을 주더라도 내용이 같으면 이 문자열은 동일(값 비교)
+  // → 무거운 레이아웃 effect가 매 렌더 재실행되며 setPositions로 리렌더하는 루프를 차단.
+  const graphSignature = useMemo(() => {
+    const nodeKey = displayNodes.map(n => n.id).join(',');
+    const edgeKey = displayEdges.map(e => `${e.source}-${e.target}`).join(',');
+    return `${nodeKey}|${edgeKey}|${userGame.level}`;
+  }, [displayNodes, displayEdges, userGame.level]);
 
   // ── Force simulation ──────────────────────────────────────────────────────────
 
@@ -409,7 +445,10 @@ export default function GraphScreen({
     simNodes.forEach(n => map.set(n.id, { x: n.x!, y: n.y! }));
     setPositions(map);
     simulationRef.current = null;
-  }, [displayNodes, displayEdges, isLocked]);
+    // graphSignature(내용 기반 문자열)로만 게이팅 — 참조만 바뀐 리렌더에선 재실행하지 않음.
+    // displayNodes/displayEdges/isLocked 는 같은 내용이면 동일 시그니처라 stale 아님.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graphSignature]);
 
   // ── Highlight logic ───────────────────────────────────────────────────────────
 
@@ -556,7 +595,11 @@ export default function GraphScreen({
   const quizCompleted = nodeSummary
     ? userGame.completedQuizzes.includes(nodeSummary.word)
     : false;
-  const nodeNews = useMemo(() => newsForSummary(nodeSummary ?? null), [nodeSummary]);
+  // 서버가 준 실제 뉴스(전 페이지 누적)가 있으면 그걸 쓰고, 없으면 합성 fallback
+  const nodeNews = useMemo(
+    () => (accumulatedNews.length > 0 ? accumulatedNews : newsForSummary(nodeSummary ?? null)),
+    [accumulatedNews, nodeSummary],
+  );
 
   return (
     <div style={{
@@ -968,7 +1011,18 @@ export default function GraphScreen({
                   </button>
                 </div>
 
-                <div style={{ flex: 1, overflowY: 'auto', padding: '12px 18px 8px' }}>
+                <div
+                  style={{ flex: 1, overflowY: 'auto', padding: '12px 18px 8px' }}
+                  onScroll={(e) => {
+                    const el = e.currentTarget;
+                    if (
+                      el.scrollHeight - el.scrollTop - el.clientHeight < 120 &&
+                      hasNextPage && !isFetchingNextPage
+                    ) {
+                      fetchNextPage();
+                    }
+                  }}
+                >
                   <p style={{
                     fontSize: 13.5,
                     lineHeight: 1.68,
@@ -991,7 +1045,7 @@ export default function GraphScreen({
                         뉴스 원문 링크 · {nodeNews.length}
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                        {nodeNews.slice(0, 4).map(news => {
+                        {nodeNews.map(news => {
                           const content = (
                             <>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
@@ -1067,6 +1121,14 @@ export default function GraphScreen({
                           );
                         })}
                       </div>
+                      {isFetchingNextPage && (
+                        <div style={{
+                          textAlign: 'center', padding: '10px 0 2px',
+                          fontSize: 11, fontWeight: 700, color: '#9A9A94',
+                        }}>
+                          뉴스 더 불러오는 중…
+                        </div>
+                      )}
                     </div>
                   )}
 
