@@ -28,6 +28,11 @@ body {
   100% { transform: translateY(0); }
 }
 
+@keyframes nodingo-panel-in {
+  0%   { opacity: 0; transform: translateX(24px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
 @keyframes nodingo-pulse {
   0%   { transform: scale(1); opacity: 0.65; }
   70%  { transform: scale(1.45); opacity: 0; }
@@ -55,15 +60,51 @@ body {
   animation: nodingo-pulse 1.8s ease-out infinite;
 }
 
-/* 실서비스 웹앱 컨테이너: 아이폰 목업 프레임을 제거하고 뷰포트 전체를 채움.
-   노치/홈바가 있는 모바일에서는 safe-area-inset 만큼 HUD 를 내려 가림을 방지. */
+/* 앱 화면 바깥 영역(shell): GraphPage 전용 래퍼.
+   데스크톱에서 컬럼 양옆을 페이지 배경으로 채워 좌우 늘어남을 방지한다.
+   (body 전역을 건드리지 않아 랜딩/로그인 페이지엔 영향 없음) */
+.nodingo-shell {
+  width: 100%;
+  min-height: 100dvh;
+}
+
+/* 실서비스 웹앱 컨테이너.
+   - 모바일: 뷰포트 전체를 채움 (full-bleed)
+   - 데스크톱(>480px): 좌우로 늘어나지 않도록 고정폭 컬럼을 가운데 정렬.
+   노치/홈바가 있는 모바일에서는 safe-area-inset 만큼 HUD 를 내려 가림 방지. */
 .nodingo-app {
   --nodingo-status-offset: env(safe-area-inset-top, 0px);
   width: 100%;
+  max-width: var(--nodingo-app-max, 480px);
   height: 100dvh;
+  margin: 0 auto;
   background: #FFFFFF;
   overflow: hidden;
   position: relative;
+}
+
+/* 데스크톱 481~1023px: 컬럼 양옆 배경 + 컬럼 경계를 살짝 구분 */
+@media (min-width: 481px) {
+  .nodingo-shell {
+    background: #EFEEEA;
+    display: flex;
+    justify-content: center;
+  }
+  .nodingo-app {
+    box-shadow: 0 0 0 1px rgba(15, 17, 21, 0.06), 0 18px 48px rgba(0, 0, 0, 0.08);
+  }
+}
+
+/* 풀 데스크톱(≥1024px) 레이아웃: 좌측 사이드바 + 넓은 메인 */
+.nodingo-desktop {
+  display: flex;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  position: relative;
+  background: #FFFFFF;
+  color: #0F1115;
+  font-family: Pretendard, -apple-system, system-ui, sans-serif;
 }
 
 a {

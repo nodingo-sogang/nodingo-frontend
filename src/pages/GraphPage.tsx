@@ -4,6 +4,8 @@ import HUD from '../components/game/HUD';
 import QuizModal from '../components/game/QuizModal';
 import ReceiptModal from '../components/game/ReceiptModal';
 import BottomNav from '../components/layout/BottomNav';
+import Sidebar from '../components/layout/Sidebar';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import GraphScreen from './graph/GraphScreen';
 import RankingScreen from './ranking/RankingScreen';
 import ProfileScreen from './profile/ProfileScreen';
@@ -365,6 +367,8 @@ export default function GraphPage() {
   const location = useLocation();
   // /preview 라우트이거나 VITE_USE_MOCK=true 면 mock 강제
   const forceMock = location.pathname === '/preview' || USE_MOCK;
+  // 데스크톱(≥1024px)에서는 사이드바 + 넓은 그래프 + 우측 패널 레이아웃으로 분기
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
   const [userGame, setUserGame] = useState<UserGame>(MOCK_USER_GAME);
   const [tab, setTab] = useState<Tab>('graph');
   const [quizFor, setQuizFor] = useState<{ keywordId: number; label: string } | null>(null);
@@ -539,8 +543,92 @@ export default function GraphPage() {
 
   const tier = tierOf(userGame.level);
 
+  // 모바일/데스크톱 공통으로 재사용하는 탭 콘텐츠 (로직·데이터 동일, 배치만 다름)
+  const graphContent = (
+    <GraphScreen
+      userGame={userGame}
+      unlockingNodes={unlockingNodes}
+      forceMock={forceMock}
+      onNodeExplore={handleNodeExplore}
+      onScrap={handleScrap}
+      onScrapChange={handleScrapChange}
+      onQuizStart={handleQuizStart}
+      isDesktop={isDesktop}
+    />
+  );
+  const scrapContent = (
+    <ScrapScreen
+      items={scrappedKeywords}
+      onOpen={(item) => {
+        setTab('graph');
+        void item;
+        setTimeout(() => setQuizFor(null), 0);
+      }}
+    />
+  );
+  const rankingContent = <RankingScreen accentColor={tier.color} userGame={userGame} />;
+  const profileContent = <ProfileScreen userGame={userGame} />;
+
+  const overlays = (
+    <>
+      {quizFor && (
+        <QuizModal
+          keywordId={quizFor.keywordId}
+          nodeId={quizFor.label}
+          nodeLabel={quizFor.label}
+          accent={tier.color}
+          forceMock={forceMock}
+          isDesktop={isDesktop}
+          onClose={() => setQuizFor(null)}
+          onComplete={handleQuizComplete}
+        />
+      )}
+      {receipt && <ReceiptModal data={receipt} onClose={() => setReceipt(null)} />}
+      <RewardPopup reward={reward} onClose={() => setReward(null)} />
+    </>
+  );
+
+  // ── 데스크톱 (≥1024px): 사이드바 + 넓은 메인 ──────────────────────────────────
+  if (isDesktop) {
+    return (
+      <div className="nodingo-desktop">
+        <Sidebar
+          active={tab}
+          onChange={setTab}
+          accentColor={tier.color}
+          userGame={userGame}
+        />
+        <main style={{
+          flex: 1, minWidth: 0,
+          position: 'relative',
+          height: '100%',
+          overflow: 'hidden',
+          background: '#FFFFFF',
+          display: 'flex', flexDirection: 'column',
+        }}>
+          {tab === 'graph' && graphContent}
+          {tab !== 'graph' && (
+            <div style={{
+              flex: 1, display: 'flex', justifyContent: 'center',
+              overflow: 'hidden', background: '#FAF7F1',
+            }}>
+              <div style={{ width: '100%', maxWidth: 560, height: '100%', position: 'relative' }}>
+                {tab === 'scrap' && scrapContent}
+                {tab === 'ranking' && rankingContent}
+                {tab === 'profile' && profileContent}
+              </div>
+            </div>
+          )}
+          {overlays}
+        </main>
+      </div>
+    );
+  }
+
+  // ── 모바일: 풀블리드 + 상단 HUD + 하단 탭 ─────────────────────────────────────
   return (
-    <div className="nodingo-app">
+    <div className="nodingo-shell">
+      <div className="nodingo-app">
         <div style={{
           position: 'relative',
           display: 'flex', flexDirection: 'column',
@@ -550,77 +638,27 @@ export default function GraphPage() {
           overflow: 'hidden',
           fontFamily: 'Pretendard, -apple-system, system-ui, sans-serif',
         }}>
-      {/* Fixed HUD */}
-      <HUD userGame={userGame} onProfileTap={() => setTab('profile')} />
+          <HUD userGame={userGame} onProfileTap={() => setTab('profile')} />
 
-      {/* Page content - pushed below HUD and above BottomNav */}
-      <div style={{
-        flex: 1,
-        marginTop: 'calc(var(--nodingo-status-offset, 0px) + 82px)',
-        marginBottom: 86,
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-      }}>
-        {tab === 'graph' && (
-          <GraphScreen
-            userGame={userGame}
-            unlockingNodes={unlockingNodes}
-            forceMock={forceMock}
-            onNodeExplore={handleNodeExplore}
-            onScrap={handleScrap}
-            onScrapChange={handleScrapChange}
-            onQuizStart={handleQuizStart}
-          />
-        )}
-        {tab === 'scrap' && (
-          <ScrapScreen
-            items={scrappedKeywords}
-            onOpen={(item) => {
-              setTab('graph');
-              void item;
-              setTimeout(() => setQuizFor(null), 0);
-            }}
-          />
-        )}
-        {tab === 'ranking' && (
-          <RankingScreen accentColor={tier.color} userGame={userGame} />
-        )}
-        {tab === 'profile' && (
-          <ProfileScreen userGame={userGame} />
-        )}
-      </div>
+          <div style={{
+            flex: 1,
+            marginTop: 'calc(var(--nodingo-status-offset, 0px) + 82px)',
+            marginBottom: 86,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+          }}>
+            {tab === 'graph' && graphContent}
+            {tab === 'scrap' && scrapContent}
+            {tab === 'ranking' && rankingContent}
+            {tab === 'profile' && profileContent}
+          </div>
 
-      {/* Bottom Nav */}
-      <BottomNav
-        active={tab}
-        onChange={setTab}
-        accentColor={tier.color}
-      />
+          <BottomNav active={tab} onChange={setTab} accentColor={tier.color} />
 
-      {/* Overlays */}
-      {quizFor && (
-        <QuizModal
-          keywordId={quizFor.keywordId}
-          nodeId={quizFor.label}
-          nodeLabel={quizFor.label}
-          accent={tier.color}
-          forceMock={forceMock}
-          onClose={() => setQuizFor(null)}
-          onComplete={handleQuizComplete}
-        />
-      )}
-      {receipt && (
-        <ReceiptModal
-          data={receipt}
-          onClose={() => setReceipt(null)}
-        />
-      )}
-      <RewardPopup
-        reward={reward}
-        onClose={() => setReward(null)}
-      />
+          {overlays}
         </div>
+      </div>
     </div>
   );
 }

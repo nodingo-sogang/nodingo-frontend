@@ -10,6 +10,8 @@ interface QuizModalProps {
   nodeLabel: string;
   accent: string;
   forceMock?: boolean;
+  /** 데스크톱: 전체 폭 바텀시트 대신 가운데 카드로 표시 */
+  isDesktop?: boolean;
   onClose: () => void;
   onComplete: (result: { correctCount: number; xpGained: number; nodeId: string }) => void;
 }
@@ -43,6 +45,7 @@ export default function QuizModal({
   nodeLabel,
   accent,
   forceMock = false,
+  isDesktop = false,
   onClose,
   onComplete,
 }: QuizModalProps) {
@@ -150,14 +153,22 @@ export default function QuizModal({
     <div style={{
       position: 'absolute', inset: 0, zIndex: 200,
       background: 'rgba(15,17,21,0.5)',
-      display: 'flex', alignItems: 'flex-end',
+      display: 'flex',
+      alignItems: isDesktop ? 'center' : 'flex-end',
+      justifyContent: 'center',
+      padding: isDesktop ? 24 : 0,
     }}>
       <div style={{
         width: '100%',
+        maxWidth: isDesktop ? 460 : undefined,
         background: '#FFFFFF',
         borderTopLeftRadius: 28, borderTopRightRadius: 28,
+        borderBottomLeftRadius: isDesktop ? 28 : 0,
+        borderBottomRightRadius: isDesktop ? 28 : 0,
         overflow: 'hidden',
-        animation: 'nodingo-sheet-in 400ms cubic-bezier(.2,.7,.2,1)',
+        animation: isDesktop
+          ? 'nodingo-modal-in 320ms cubic-bezier(.2,.7,.2,1)'
+          : 'nodingo-sheet-in 400ms cubic-bezier(.2,.7,.2,1)',
       }}>
         {loading || !q ? (
           <div style={{ padding: '48px 20px', textAlign: 'center' }}>
