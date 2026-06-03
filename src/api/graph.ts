@@ -13,6 +13,10 @@ export const graphApi = {
   getNodeSummary: (nodeId: number) =>
     apiClient.get<ApiResponse<NodeSummaryResponse>>(`/api/graphs/nodes/${nodeId}/summaries`),
 
+  // 노드 탐험 기록 저장 (서버 측 explored/visibility 갱신)
+  exploreNode: (keywordId: number) =>
+    apiClient.post<ApiResponse<void>>(`/api/graphs/nodes/${keywordId}/explore`),
+
   scrapKeyword: (keywordId: number) =>
     apiClient.post<ApiResponse<void>>(`/api/keywords/${keywordId}/scrap`),
 

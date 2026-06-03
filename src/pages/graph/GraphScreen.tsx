@@ -144,7 +144,7 @@ interface GraphScreenProps {
   onNodeExplore: (nodeId: number, nodeLabel: string) => void;
   onScrap: (nodeId: number, nodeLabel: string) => void;
   onScrapChange?: (item: ScrappedNode, scrapped: boolean) => void;
-  onQuizStart: (nodeLabel: string) => void;
+  onQuizStart: (keywordId: number, nodeLabel: string) => void;
 }
 
 export default function GraphScreen({
@@ -510,6 +510,10 @@ export default function GraphScreen({
       // XP for exploration
       if (!exploredRef.current.has(node.id)) {
         exploredRef.current.add(node.id);
+        // 서버에 탐험 기록 저장 (멱등성 보장 · +5 XP). 실패해도 UX 진행.
+        if (!forceMock) {
+          graphApi.exploreNode(node.id).catch(() => {});
+        }
         onNodeExplore(node.id, node.label);
       }
     }
@@ -519,7 +523,7 @@ export default function GraphScreen({
       simulationRef.current?.alphaTarget(0);
       dragNodeRef.current = null;
     }
-  }, [isLocked, onNodeExplore]);
+  }, [isLocked, onNodeExplore, forceMock]);
 
   // ── Daily goal indicator ──────────────────────────────────────────────────────
 
@@ -1073,7 +1077,7 @@ export default function GraphScreen({
                     onClick={() => {
                       if (quizCompleted) return;
                       setSheetOpen(false);
-                      onQuizStart(nodeSummary.word);
+                      onQuizStart(nodeSummary.keyword_id, nodeSummary.word);
                     }}
                     style={{
                       width: '100%', padding: '13px 0', borderRadius: 18,

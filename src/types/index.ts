@@ -113,6 +113,14 @@ export interface GraphNodeResponse {
   score: number;
   summary: string;
   persona: string;
+
+  // ── 게이미피케이션 필드 (백엔드 GraphNodeResponse) ──
+  // 백엔드가 반환하면 채워지고, mock/구버전 응답에서는 undefined 일 수 있음
+  unlock_level?: number;
+  visibility?: string;
+  explored?: boolean;
+  scrapped?: boolean;
+  news_count?: number;
 }
 
 export interface GraphEdgeResponse {
@@ -171,4 +179,65 @@ export interface UpdateNotificationTimeRequest {
 
 export interface UpdateFcmTokenRequest {
   fcm_token: string;
+}
+
+// ─── Quiz ─────────────────────────────────────────────────────────────────────
+
+export interface QuizResponse {
+  quiz_id: number;
+  question: string;
+  options: string[];
+  source_outlet: string;
+  /** 백엔드 포맷: "yyyy.MM.dd" */
+  source_date: string;
+  source_url: string;
+}
+
+export interface QuizListResponse {
+  quizzes: QuizResponse[];
+}
+
+export interface QuizSubmitRequest {
+  /** 선택한 보기 인덱스 (1~4, 1-based) */
+  selected_option_index: number;
+}
+
+export interface QuizRewardResponse {
+  correct: boolean;
+  /** 정답 보기 인덱스 (1-based) */
+  correct_answer_index: number;
+  earned_xp: number;
+  total_xp: number;
+  level: number;
+  level_up: boolean;
+  new_badges: string[];
+  unlocked_nodes: number[];
+}
+
+// ─── Game / Progress ──────────────────────────────────────────────────────────
+
+export interface UserGameResponse {
+  level: number;
+  xp: number;
+  xp_needed: number;
+  tier: string;
+  streak: number;
+}
+
+export interface DailyGoalsResponse {
+  quizzes_completed: number;
+  quizzes_required: number;
+  completed: boolean;
+}
+
+export interface GameProfileResponse {
+  user_game: UserGameResponse;
+  daily_goals: DailyGoalsResponse;
+}
+
+/** GET /api/users/progress — 내 탐험 진행률 (출석 체크 포함) */
+export interface UserProgressResponse {
+  explored_count: number;
+  total_count: number;
+  progress_rate: number;
 }

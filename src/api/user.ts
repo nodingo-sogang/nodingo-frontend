@@ -4,6 +4,7 @@ import type {
   PersonaListResponse,
   KeywordListResponse,
   OnboardingRequest,
+  OnboardingStatusResponse,
   UserPersona,
 } from '../types';
 
@@ -23,4 +24,8 @@ export const userApi = {
 
   postOnboarding: (body: OnboardingRequest) =>
     apiClient.post<ApiResponse<void>>('/api/users/onboarding', body),
+
+  // 온보딩 완료 여부 (라우트 가드용)
+  getOnboardingStatus: () =>
+    apiClient.get<ApiResponse<OnboardingStatusResponse>>('/api/users/onboarding/status'),
 };
