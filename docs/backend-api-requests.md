@@ -126,6 +126,12 @@ if (recommendKeywordRepository.existsByUserIdAndTargetDate(user.getId(), today))
 - `category` enum: `attendance` | `explore` | `quiz` | `social` | `special` (프론트가 아이콘 매핑에 사용)
 - `earned`(bool), `earned_at`(string \| null, 미획득 시 null)
 
+> **⚠️ 중요 — 뱃지 획득은 서버에서 판정·저장해야 함 (현재 버그):**
+> 지금 프론트가 뱃지 조건을 **클라이언트에서 계산**하고 획득 상태를 어디에도 저장하지 않아서, **매 로그인/새로고침마다 "첫 접속 환영" 뱃지가 다시 뜹니다.**
+> - 백엔드가 뱃지 조건(첫 로그인, 탐험 N회, 퀴즈 N개, 스트릭 N일, 스크랩, 친구 등)을 **이벤트 발생 시 판정해 획득 상태를 영구 저장**해야 함
+> - 그러면 프론트는 `GET /api/users/badges`의 `earned`만 표시 → 재발급 없음
+> - 참고: 퀴즈 제출 응답의 `new_badges`(이번에 새로 딴 뱃지 id)는 이미 있음 → **다른 트리거(탐험/스트릭/출석 등)도 동일하게 서버에서 지급**하면 일관됨
+
 ---
 
 ## 2. 🟡 기존 응답 확장 요청
