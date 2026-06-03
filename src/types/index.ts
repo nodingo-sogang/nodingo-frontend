@@ -200,13 +200,14 @@ export interface QuizListResponse {
 }
 
 export interface QuizSubmitRequest {
-  /** 선택한 보기 인덱스 (1~4, 1-based) */
+  /** 선택한 보기 인덱스 — 백엔드 검증이 1-based(1~4)를 요구함 (@Min(1)@Max(4)) */
   selected_option_index: number;
 }
 
 export interface QuizRewardResponse {
+  /** ⚠️ 백엔드 채점 버그(0-based 정답 vs 1-based 제출 불일치)로 신뢰 불가 — 프론트에서 직접 판정 */
   correct: boolean;
-  /** 정답 보기 인덱스 (1-based) */
+  /** 정답 보기 인덱스 (0-based, 0~3) */
   correct_answer_index: number;
   earned_xp: number;
   total_xp: number;

@@ -17,6 +17,44 @@
 
 ---
 
+## ⚠️ A. 버그 수정 요청 (긴급 — 연동 중 발견)
+
+### A-1. 🔴 퀴즈 채점 인덱스 불일치 (정답 맞혀도 오답 처리)
+**증상:** 정답을 골라도 오답 처리되고 XP가 안 들어감. **1번 보기(0번 인덱스)가 정답이면 영영 못 맞힘.**
+
+**원인:** 제출 검증과 정답 저장의 인덱스 기준이 다름
+- `QuizSubmitRequest.selectedOptionIndex` → `@Min(1) @Max(4)` = **1-based**
+- `Quiz.answerIndex` (AI 생성) → **0-based** (스웨거 응답 `correct_answer_index: 0` 확인)
+- 채점이 둘을 직접 비교 → 항상 한 칸 어긋남
+
+```java
+// QuizService.submitQuiz — 변경 전
+boolean isCorrect = quiz.getAnswerIndex().equals(command.getSelectedOptionIndex());
+// 변경 후 (1-based 제출을 0-based로 변환해 비교)
+boolean isCorrect = quiz.getAnswerIndex().equals(command.getSelectedOptionIndex() - 1);
+```
+- `correct_answer_index`(응답)는 **0-based 그대로** 두면 됨 (프론트가 이미 0-based로 정답 표시 중)
+- ✅ 프론트는 정답 "표시"는 자체 보정해뒀으나, **XP 적립은 이 수정이 있어야 정상화**됨
+
+### A-2. 🟡 퀴즈 목록에 풀이 여부(`solved`) 플래그
+**화면:** 이미 푼 퀴즈는 다시 못 풀게 하거나 "완료" 표시 필요. 현재 목록 API가 풀이 여부를 안 줘서 **제출(400) 후에야** 알 수 있음.
+- 요청: `GET /api/graphs/nodes/{keywordId}/quizzes` 각 항목에 `"solved": true|false` 추가
+- (현재는 재제출 시 `400 이미 제출한 퀴즈`로만 구분 — 프론트가 "이미 풀었어요" 안내로 임시 처리 중)
+
+### A-3. 🟡 재온보딩 시 추천 재생성 안 됨
+**증상:** 페르소나를 바꿔 다시 온보딩해도 추천 탭이 그대로 고정 (예: 문화 선택 → 반도체 추천).
+
+**원인:** `RecommendKeywordInitService.initForNewUser`가 그날 추천이 이미 있으면 스킵
+```java
+if (recommendKeywordRepository.existsByUserIdAndTargetDate(user.getId(), today)) {
+    return; // ← 재온보딩해도 추천 재생성 안 함
+}
+```
+- 요청: `saveOnboardingInfo`가 오늘 관심사를 지우고 다시 넣듯, **재온보딩 시 오늘 RecommendKeyword도 삭제 후 재생성**(또는 테스트용 리셋 엔드포인트)
+- → 한 계정으로 페르소나 바꿔가며 추천 변화를 테스트할 수 있게 됨
+
+---
+
 ## 1. 🔴 신규 요청 — 현재 백엔드에 없음
 
 ### 1-1. 랭킹(리더보드) 조회

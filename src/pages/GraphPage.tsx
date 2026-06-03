@@ -380,8 +380,9 @@ export default function GraphPage() {
 
   const prevLevelRef = useRef(userGame.level);
 
-  // Daily first-visit XP
+  // mock(데모) 모드 한정: 일일 첫 방문 보너스. 라이브는 서버가 출석 처리하므로 제외.
   useEffect(() => {
+    if (!forceMock) return;
     const today = new Date().toDateString();
     const last = localStorage.getItem('nodingo_last_visit');
     if (last !== today) {
@@ -389,42 +390,41 @@ export default function GraphPage() {
       setUserGame(prev => applyXp(prev, 10));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // 서버에서 게임 프로필 + 탐험 진행률을 받아 mock 위에 오버레이.
-  // (GET /api/users/game · GET /api/users/progress) 실패 시 mock 유지.
-  useEffect(() => {
-    if (forceMock) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const [profileRes, progressRes] = await Promise.all([
-          gameApi.getProfile(),
-          gameApi.getProgress(),
-        ]);
-        if (cancelled) return;
-        const profile = profileRes.data.data;
-        const progress = progressRes.data.data;
-        if (profile) {
-          // 서버 레벨로 동기화하되 level-up 리워드 팝업이 뜨지 않도록 prevLevel 보정
-          prevLevelRef.current = profile.user_game.level;
-        }
-        setUserGame(prev => ({
-          ...prev,
-          level: profile?.user_game.level ?? prev.level,
-          xp: profile?.user_game.xp ?? prev.xp,
-          streak: profile?.user_game.streak ?? prev.streak,
-          dailyGoal: profile?.daily_goals.quizzes_required ?? prev.dailyGoal,
-          dailyProgress: profile?.daily_goals.quizzes_completed ?? prev.dailyProgress,
-          totalNodesExplored: progress?.explored_count ?? prev.totalNodesExplored,
-        }));
-      } catch {
-        // 서버 미응답 시 mock 데이터 유지
-      }
-    })();
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [forceMock]);
+
+  // 게임 레벨/XP의 단일 진실 = 백엔드. /game · /progress를 받아 서버 값으로 동기화한다.
+  // 액션(탐험·스크랩·퀴즈) 후 호출하면 화면이 서버와 항상 일치 → 새로고침 시 "리셋" 사라짐.
+  // suppressReward=true면 초기 로드 시 level-up 팝업을 띄우지 않는다.
+  const syncGameFromServer = useCallback(async (suppressReward = false) => {
+    if (forceMock) return;
+    try {
+      const [profileRes, progressRes] = await Promise.all([
+        gameApi.getProfile(),
+        gameApi.getProgress(),
+      ]);
+      const profile = profileRes.data.data;
+      const progress = progressRes.data.data;
+      if (profile && suppressReward) {
+        prevLevelRef.current = profile.user_game.level;
+      }
+      setUserGame(prev => ({
+        ...prev,
+        level: profile?.user_game.level ?? prev.level,
+        xp: profile?.user_game.xp ?? prev.xp,
+        streak: profile?.user_game.streak ?? prev.streak,
+        dailyGoal: profile?.daily_goals.quizzes_required ?? prev.dailyGoal,
+        dailyProgress: profile?.daily_goals.quizzes_completed ?? prev.dailyProgress,
+        totalNodesExplored: progress?.explored_count ?? prev.totalNodesExplored,
+      }));
+    } catch {
+      // 서버 미응답 시 현재 상태 유지
+    }
+  }, [forceMock]);
+
+  // 초기 로드: 서버 값으로 동기화 (리워드 팝업 억제)
+  useEffect(() => {
+    void syncGameFromServer(true);
+  }, [syncGameFromServer]);
 
   // Watch for level-up to trigger unlock animation
   useEffect(() => {
@@ -479,18 +479,28 @@ export default function GraphPage() {
   // ── Callbacks from GraphScreen ────────────────────────────────────────────────
 
   const handleNodeExplore = useCallback((_nodeId: number, _nodeLabel: string) => {
-    setUserGame(prev => applyXp(
-      { ...prev, totalNodesExplored: prev.totalNodesExplored + 1 },
-      5,
-    ));
-  }, []);
+    if (forceMock) {
+      setUserGame(prev => applyXp(
+        { ...prev, totalNodesExplored: prev.totalNodesExplored + 1 },
+        5,
+      ));
+    } else {
+      // 서버가 탐험 XP(+5)를 적립 → 최신 레벨/진행률을 서버에서 다시 가져옴
+      void syncGameFromServer();
+    }
+  }, [forceMock, syncGameFromServer]);
 
   const handleScrap = useCallback((_nodeId: number, _nodeLabel: string) => {
-    setUserGame(prev => applyXp({
+    // 뱃지용 로컬 스크랩 목록은 항상 갱신
+    setUserGame(prev => ({
       ...prev,
       scrapped: prev.scrapped.includes(_nodeLabel) ? prev.scrapped : [...prev.scrapped, _nodeLabel],
-    }, 3));
-  }, []);
+    }));
+    // mock은 로컬 XP, 라이브는 서버가 스크랩 XP 적립 (동기화는 onGameSync에서 처리)
+    if (forceMock) {
+      setUserGame(prev => applyXp(prev, 3));
+    }
+  }, [forceMock]);
 
   const handleScrapChange = useCallback((item: ScrappedKeyword, scrapped: boolean) => {
     setScrappedKeywords(prev => {
@@ -516,8 +526,8 @@ export default function GraphPage() {
     const willCompleteGoal = userGame.dailyProgress + 1 >= userGame.dailyGoal;
     const bonusXp = willCompleteGoal && !receiptShownToday ? 50 : 0;
 
-    setUserGame(prev => {
-      const updated = applyXp(
+    if (forceMock) {
+      setUserGame(prev => applyXp(
         {
           ...prev,
           totalQuizzesSolved: prev.totalQuizzesSolved + result.correctCount,
@@ -525,9 +535,16 @@ export default function GraphPage() {
           completedQuizzes: [...prev.completedQuizzes, result.nodeId],
         },
         result.xpGained + bonusXp,
-      );
-      return updated;
-    });
+      ));
+    } else {
+      // 라이브: 뱃지/완료표시용 로컬 필드만 갱신, 레벨/XP/진행률은 서버에서 동기화
+      setUserGame(prev => ({
+        ...prev,
+        totalQuizzesSolved: prev.totalQuizzesSolved + result.correctCount,
+        completedQuizzes: [...prev.completedQuizzes, result.nodeId],
+      }));
+      void syncGameFromServer();
+    }
 
     if (willCompleteGoal && !receiptShownToday) {
       setReceiptShownToday(true);
@@ -539,7 +556,7 @@ export default function GraphPage() {
         serial: `NDG-${Date.now().toString().slice(-8)}`,
       });
     }
-  }, [userGame.dailyProgress, userGame.dailyGoal, receiptShownToday]);
+  }, [userGame.dailyProgress, userGame.dailyGoal, receiptShownToday, forceMock, syncGameFromServer]);
 
   const tier = tierOf(userGame.level);
 
@@ -553,6 +570,7 @@ export default function GraphPage() {
       onScrap={handleScrap}
       onScrapChange={handleScrapChange}
       onQuizStart={handleQuizStart}
+      onGameSync={syncGameFromServer}
       isDesktop={isDesktop}
     />
   );

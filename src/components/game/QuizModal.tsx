@@ -60,6 +60,8 @@ export default function QuizModal({
   const [correctCount, setCorrectCount] = useState(0);
   const [earnedXp, setEarnedXp] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  // 이미 제출한 퀴즈 (백엔드 400) — 정답/오답 대신 "이미 풀었어요" 안내
+  const [alreadyDone, setAlreadyDone] = useState(false);
   const [phase, setPhase] = useState<'question' | 'answer' | 'result'>('question');
 
   // ── 퀴즈 목록 로드 (GET /api/graphs/nodes/{keywordId}/quizzes) ──────────────────
@@ -108,16 +110,23 @@ export default function QuizModal({
       // 서버 채점 (POST .../quizzes/{quizId}/submit)
       setSubmitting(true);
       try {
+        // 백엔드 검증이 1-based(1~4)를 요구하므로 idx+1로 전송
         const res = await quizApi.submit(keywordId, q.id, { selected_option_index: idx + 1 });
         const reward = res.data.data;
-        const answerIdx = reward ? reward.correct_answer_index - 1 : idx;
+        // 백엔드 correct_answer_index(=answerIndex)는 0-based → 그대로 정답 인덱스로 사용
+        const answerIdx = reward ? reward.correct_answer_index : null;
         setRevealedAnswer(answerIdx);
-        if (reward?.correct) {
+        // ⚠️ 백엔드 채점(correct/earned_xp)은 0-based 정답 vs 1-based 제출 불일치 버그가 있어
+        //    정/오답은 프론트에서 직접 판정 (정답 인덱스 == 내가 고른 인덱스)
+        const isCorrect = answerIdx !== null ? idx === answerIdx : Boolean(reward?.correct);
+        if (isCorrect) {
           setCorrectCount(c => c + 1);
-          setEarnedXp(x => x + (reward.earned_xp ?? 0));
+          setEarnedXp(x => x + (reward?.earned_xp ?? 0));
         }
-      } catch {
-        // 채점 실패 시 정답을 알 수 없으므로 선택만 표시
+      } catch (err) {
+        // 400 = 이미 제출한 퀴즈 → "이미 풀었어요" 안내 (정답/오답 표시 안 함)
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        if (status === 400) setAlreadyDone(true);
         setRevealedAnswer(null);
       } finally {
         setSubmitting(false);
@@ -137,6 +146,7 @@ export default function QuizModal({
       setCurrent(c => c + 1);
       setSelected(null);
       setRevealedAnswer(null);
+      setAlreadyDone(false);
       setPhase('question');
     } else {
       setPhase('result');
@@ -228,6 +238,7 @@ export default function QuizModal({
                   let color = '#0F1115';
                   if (phase === 'answer') {
                     if (revealedAnswer !== null && i === revealedAnswer) { bg = '#E8F6EC'; border = '1.5px solid #5BBA6F'; color = '#1E8460'; }
+                    else if (i === selected && alreadyDone) { bg = '#F4F4F0'; border = '1.5px solid #D8D8D2'; color = '#6B6B66'; }
                     else if (i === selected) { bg = '#FCEBEB'; border = '1.5px solid #FF6B6B'; color = '#D84A4A'; }
                   }
                   return (
@@ -247,6 +258,17 @@ export default function QuizModal({
                   );
                 })}
               </div>
+
+              {phase === 'answer' && alreadyDone && (
+                <div style={{
+                  marginTop: 12, padding: '10px 12px', borderRadius: 12,
+                  background: '#F4F4F0', color: '#6B6B66',
+                  fontSize: 12.5, fontWeight: 700,
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}>
+                  ✓ 이미 푼 퀴즈예요. 다음 문제로 넘어가세요.
+                </div>
+              )}
 
               {phase === 'answer' && (
                 <div style={{ marginTop: 12, fontSize: 11, color: '#6B6B66' }}>

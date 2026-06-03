@@ -145,6 +145,8 @@ interface GraphScreenProps {
   onScrap: (nodeId: number, nodeLabel: string) => void;
   onScrapChange?: (item: ScrappedNode, scrapped: boolean) => void;
   onQuizStart: (keywordId: number, nodeLabel: string) => void;
+  /** 액션(스크랩 등) 후 서버 게임 상태 재동기화 트리거 */
+  onGameSync?: () => void;
   /** 데스크톱 레이아웃: 노드 상세를 바텀시트 대신 우측 패널로 표시 */
   isDesktop?: boolean;
 }
@@ -157,6 +159,7 @@ export default function GraphScreen({
   onScrap,
   onScrapChange,
   onQuizStart,
+  onGameSync,
   isDesktop = false,
 }: GraphScreenProps) {
   const [isLiveData, setIsLiveData] = useState(false);
@@ -351,6 +354,8 @@ export default function GraphScreen({
         return next;
       });
     },
+    // 스크랩/해제 커밋 후 서버 게임 상태(스크랩 XP 등) 재동기화
+    onSettled: () => onGameSync?.(),
   });
 
   // ── Node lock check ───────────────────────────────────────────────────────────
@@ -552,11 +557,14 @@ export default function GraphScreen({
       // XP for exploration
       if (!exploredRef.current.has(node.id)) {
         exploredRef.current.add(node.id);
-        // 서버에 탐험 기록 저장 (멱등성 보장 · +5 XP). 실패해도 UX 진행.
-        if (!forceMock) {
-          graphApi.exploreNode(node.id).catch(() => {});
+        if (forceMock) {
+          onNodeExplore(node.id, node.label);
+        } else {
+          // 서버에 탐험 기록 저장 (멱등성 · +5 XP) → 커밋 후 콜백 호출해 서버값 동기화
+          graphApi.exploreNode(node.id)
+            .then(() => onNodeExplore(node.id, node.label))
+            .catch(() => onNodeExplore(node.id, node.label));
         }
-        onNodeExplore(node.id, node.label);
       }
     }
     if (dragNodeRef.current) {
