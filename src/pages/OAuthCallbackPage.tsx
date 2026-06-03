@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { userApi } from '../api/user';
 import styles from './OAuthCallbackPage.module.css';
 
 const ONBOARDED_KEY = 'nd_onboarded';
@@ -8,7 +9,7 @@ const ONBOARDED_KEY = 'nd_onboarded';
 export default function OAuthCallbackPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { login } = useAuthStore();
+  const { login, setOnboarded } = useAuthStore();
   const handled = useRef(false);
 
   useEffect(() => {
@@ -23,12 +24,26 @@ export default function OAuthCallbackPage() {
       return;
     }
 
-    // 백엔드가 onboarded 파라미터를 보내지 않으므로 localStorage에서 확인
-    const alreadyOnboarded = localStorage.getItem(ONBOARDED_KEY) === 'true';
+    // 온보딩 완료 여부는 localStorage가 아니라 백엔드 상태를 진실로 본다.
+    // (다른 브라우저/캐시 삭제 시에도 이미 온보딩한 계정은 온보딩을 반복하지 않도록)
+    const localOnboarded = localStorage.getItem(ONBOARDED_KEY) === 'true';
+    login(accessToken, refreshToken, localOnboarded); // 토큰부터 저장 (이후 API 호출용)
 
-    login(accessToken, refreshToken, alreadyOnboarded);
-    navigate(alreadyOnboarded ? '/graph' : '/onboarding', { replace: true });
-  }, [searchParams, login, navigate]);
+    (async () => {
+      try {
+        const res = await userApi.getOnboardingStatus();
+        if (res.data.data?.status === 'COMPLETED') {
+          setOnboarded();
+          navigate('/graph', { replace: true });
+        } else {
+          navigate('/onboarding', { replace: true });
+        }
+      } catch {
+        // 상태 조회 실패 시 기존 localStorage 기준으로 폴백
+        navigate(localOnboarded ? '/graph' : '/onboarding', { replace: true });
+      }
+    })();
+  }, [searchParams, login, setOnboarded, navigate]);
 
   return (
     <div className={styles.page}>
