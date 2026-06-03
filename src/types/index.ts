@@ -148,6 +148,8 @@ export interface NodeSummaryResponse {
   word: string;
   persona: string;
   summary: string;
+  /** 뉴스 무한 스크롤 페이징: 다음 페이지 존재 여부 */
+  has_next?: boolean;
   news?: NewsItemBrief[];
 }
 
