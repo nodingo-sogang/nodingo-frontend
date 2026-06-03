@@ -5,7 +5,7 @@ import type {
   PersonaListResponse,
   KeywordListResponse,
 } from '../types';
-import type { Tier, Badge, UserGame, RankingEntry } from '../types/game';
+import type { Tier, Badge, UserGame, RankingEntry, Friend } from '../types/game';
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 
@@ -643,6 +643,15 @@ export const MOCK_QUIZZES: Record<string, Array<{
     { q:'이 키워드와 가장 관련 깊은 개념은?', options:['지식그래프','이미지 처리','음성 인식','블록체인'], a:0, source:{outlet:'Nodingo AI', date:'2025.05.27'} },
   ],
 };
+
+// 친구 (초대 코드) — 백엔드 연결 전 골격용 mock
+export const MOCK_INVITE_CODE = 'NDG-7F3A';
+
+export const MOCK_FRIENDS: Friend[] = [
+  { user_id: 101, name: '찬우', level: 28, persona: '기술' },
+  { user_id: 102, name: '상운', level: 25, persona: '국제' },
+  { user_id: 103, name: '성민', level: 22, persona: '경제' },
+];
 
 export const MOCK_RANKING_FRIENDS: RankingEntry[] = [
   { rank:1,  name:'찬우', avatar:'', level:28, weekXp:1840, persona:'기술' },

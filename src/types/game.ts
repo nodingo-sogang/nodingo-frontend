@@ -48,3 +48,11 @@ export interface ReceiptData {
   synapseTo: string;
   serial: string;
 }
+
+// 친구 (초대 코드 방식) — 백엔드 GET /api/users/friends 항목과 매핑
+export interface Friend {
+  user_id: number;
+  name: string;
+  level: number;
+  persona?: string;
+}

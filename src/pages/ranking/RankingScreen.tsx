@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { MOCK_RANKING_FRIENDS, MOCK_RANKING_PERSONA, tierOf, xpForLevel } from '../../mocks';
+import FriendManageSheet from '../../components/social/FriendManageSheet';
 import type { RankingEntry, UserGame } from '../../types/game';
 
 const PODIUM_COLORS = ['#F5B82E', '#C0C0C0', '#CD7F32'];
@@ -178,6 +179,7 @@ export default function RankingScreen({ accentColor, userGame }: RankingScreenPr
   const [rankTab, setRankTab] = useState<'friends' | 'persona'>('friends');
   const [toast, setToast] = useState('');
   const [mapUser, setMapUser] = useState<RankingEntry | null>(null);
+  const [friendSheet, setFriendSheet] = useState(false);
   const entries = rankTab === 'friends' ? MOCK_RANKING_FRIENDS : MOCK_RANKING_PERSONA;
   const top3 = entries.filter(e => e.rank <= 3);
   const rest = entries.filter(e => e.rank > 3 && !e.isMe);
@@ -269,6 +271,19 @@ export default function RankingScreen({ accentColor, userGame }: RankingScreenPr
             {t === 'friends' ? '친구' : '관심분야'}
           </button>
         ))}
+        <button
+          onClick={() => setFriendSheet(true)}
+          style={{
+            marginLeft: 'auto', padding: '7px 14px', borderRadius: 999,
+            border: `1.5px solid ${accentColor}`,
+            background: '#FFFFFF', color: accentColor,
+            fontSize: 13, fontWeight: 800, cursor: 'pointer',
+            fontFamily: 'Pretendard, -apple-system, system-ui, sans-serif',
+            display: 'flex', alignItems: 'center', gap: 4,
+          }}
+        >
+          <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> 친구
+        </button>
       </div>
 
       <Podium entries={top3} accentColor={accentColor} />
@@ -323,6 +338,10 @@ export default function RankingScreen({ accentColor, userGame }: RankingScreenPr
         }}>
           {toast}
         </div>
+      )}
+
+      {friendSheet && (
+        <FriendManageSheet accentColor={accentColor} onClose={() => setFriendSheet(false)} />
       )}
 
       {mapUser && (
