@@ -38,7 +38,7 @@
 }
 
 .secondary:hover:not(:disabled) {
-  background-color: rgba(0, 102, 204, 0.07);
+  background-color: rgba(91, 186, 111, 0.08);
 }
 
 .ghost {

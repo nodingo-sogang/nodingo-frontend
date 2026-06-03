@@ -10,6 +10,18 @@ import styles from './OnboardingPage.module.css';
 
 type Step = 'persona' | 'macro' | 'specific' | 'loading';
 
+// 메인 그래프의 페르소나 시그니처 파스텔 + 이모지 + 짧은 태그라인 (무드 통일)
+const PERSONA_THEME: Record<UserPersona, { soft: string; stroke: string; emoji: string; tagline: string }> = {
+  POLITICS: { soft: '#EAF3FF', stroke: '#7CB5F4', emoji: '🏛️', tagline: '정책·선거·국회' },
+  ECONOMY: { soft: '#FFF5E6', stroke: '#F1B45E', emoji: '💰', tagline: '금리·증시·부동산' },
+  TECHNOLOGY: { soft: '#EAF8EE', stroke: '#7BCF91', emoji: '🔬', tagline: 'AI·반도체·IT' },
+  SOCIETY: { soft: '#F4ECFF', stroke: '#B996EA', emoji: '👥', tagline: '복지·교육·노동' },
+  CULTURE: { soft: '#FFECEC', stroke: '#F08C8C', emoji: '🎭', tagline: '예술·콘텐츠·트렌드' },
+  INTERNATIONAL: { soft: '#E9F8FB', stroke: '#7CCFDC', emoji: '🌍', tagline: '외교·통상·세계' },
+};
+
+const DINGO_IMG = '/assets/characters/tier1_새내기.png';
+
 export default function OnboardingPage() {
   const navigate = useNavigate();
   const { setOnboarded } = useAuthStore();
@@ -113,6 +125,23 @@ export default function OnboardingPage() {
     navigate('/graph', { replace: true });
   };
 
+  // 단계마다 등장하는 딩고 한마디 배너 (무드 통일)
+  const dingoBanner = (msg: string) => (
+    <div className={styles.dingo}>
+      <span className={styles.dingoFace}>
+        <img
+          src={DINGO_IMG}
+          alt="딩고"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).style.display = 'none';
+            (e.currentTarget.parentElement as HTMLElement).textContent = '🐦';
+          }}
+        />
+      </span>
+      <span className={styles.dingoMsg}>{msg}</span>
+    </div>
+  );
+
   const handlePersonaSelect = (persona: UserPersona) => {
     setSelectedPersona(persona);
     setStep('macro');
@@ -189,47 +218,35 @@ export default function OnboardingPage() {
       {/* Step: Persona */}
       {step === 'persona' && (
         <div className={styles.content}>
+          {dingoBanner('딩고가 너에게 딱 맞는 지식지도를 그려줄게! 🌱')}
           <h1 className={styles.title}>어떤 분야에 관심 있으신가요?</h1>
           <p className={styles.sub}>관심 분야를 하나 선택해주세요</p>
           <div className={styles.grid}>
-            {personas.length === 0
-              ? Object.entries(PERSONA_LABEL).map(([key, label]) => (
-                  <button
-                    key={key}
-                    className={[
-                      styles.card,
-                      selectedPersona === key ? styles.selected : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                    onClick={() => handlePersonaSelect(key as UserPersona)}
-                  >
-                    <span className={styles.cardLabel}>{label}</span>
-                    {selectedPersona === key && (
-                      <span className={styles.check}>✓</span>
-                    )}
-                  </button>
-                ))
-              : personas.map((p) => (
-                  <button
-                    key={p.name}
-                    className={[
-                      styles.card,
-                      selectedPersona === p.name ? styles.selected : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                    onClick={() => handlePersonaSelect(p.name)}
-                  >
-                    <span className={styles.cardLabel}>{PERSONA_LABEL[p.name]}</span>
-                    {p.description && (
-                      <span className={styles.cardDesc}>{p.description}</span>
-                    )}
-                    {selectedPersona === p.name && (
-                      <span className={styles.check}>✓</span>
-                    )}
-                  </button>
-                ))}
+            {(personas.length === 0
+              ? (Object.keys(PERSONA_LABEL) as UserPersona[]).map((name) => ({ name, description: undefined as string | undefined }))
+              : personas
+            ).map((p) => {
+              const t = PERSONA_THEME[p.name];
+              const sel = selectedPersona === p.name;
+              return (
+                <button
+                  key={p.name}
+                  className={styles.card}
+                  style={{
+                    background: sel ? t.soft : '#FFFFFF',
+                    borderColor: sel ? t.stroke : '#EFEEEA',
+                  }}
+                  onClick={() => handlePersonaSelect(p.name)}
+                >
+                  <span style={{ fontSize: 26, lineHeight: 1 }}>{t.emoji}</span>
+                  <span className={styles.cardLabel}>{PERSONA_LABEL[p.name]}</span>
+                  <span className={styles.cardDesc}>{t.tagline}</span>
+                  {sel && (
+                    <span className={styles.check} style={{ color: t.stroke }}>✓</span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -237,6 +254,9 @@ export default function OnboardingPage() {
       {/* Step: Macro keywords */}
       {step === 'macro' && (
         <div className={styles.content}>
+          {dingoBanner(
+            `${selectedPersona ? PERSONA_THEME[selectedPersona].emoji + ' ' + PERSONA_LABEL[selectedPersona] : ''} 좋아! 어떤 주제가 끌려? 🔍`,
+          )}
           <h1 className={styles.title}>
             {selectedPersona ? PERSONA_LABEL[selectedPersona] : ''} 분야의<br />
             어떤 주제가 궁금하신가요?
@@ -271,6 +291,7 @@ export default function OnboardingPage() {
       {/* Step: Specific keywords */}
       {step === 'specific' && (
         <div className={styles.content}>
+          {dingoBanner('거의 다 왔어! 세부 키워드를 골라줘 ✨')}
           <h1 className={styles.title}>
             세부 키워드를 선택해주세요
           </h1>
@@ -325,44 +346,19 @@ export default function OnboardingPage() {
       {/* Step: Loading */}
       {step === 'loading' && (
         <div className={styles.loadingScreen}>
-          <div className={styles.loadingGraph}>
-            <svg viewBox="0 0 200 200" className={styles.loadingSvg}>
-              {[
-                [100, 100, 24, '#0066cc'],
-                [55, 55, 14, '#30d158'],
-                [145, 55, 14, '#ff9f0a'],
-                [55, 145, 14, '#bf5af2'],
-                [145, 145, 14, '#ff453a'],
-              ].map(([cx, cy, r, fill], i) => (
-                <circle
-                  key={i}
-                  cx={cx as number}
-                  cy={cy as number}
-                  r={r as number}
-                  fill={fill as string}
-                  fillOpacity="0.8"
-                  className={styles.pulseNode}
-                  style={{ animationDelay: `${i * 0.15}s` }}
-                />
-              ))}
-              {[
-                [100, 100, 55, 55],
-                [100, 100, 145, 55],
-                [100, 100, 55, 145],
-                [100, 100, 145, 145],
-              ].map(([x1, y1, x2, y2], i) => (
-                <line
-                  key={i}
-                  x1={x1 as number}
-                  y1={y1 as number}
-                  x2={x2 as number}
-                  y2={y2 as number}
-                  stroke="#0066cc"
-                  strokeWidth="1.5"
-                  strokeOpacity="0.3"
-                />
-              ))}
-            </svg>
+          <div className={styles.loadingCharacter}>
+            <span className={styles.loadingRing} />
+            <span className={`${styles.loadingRing} ${styles.delay}`} />
+            <span className={styles.loadingFace}>
+              <img
+                src={DINGO_IMG}
+                alt="딩고"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = 'none';
+                  (e.currentTarget.parentElement as HTMLElement).textContent = '🐦';
+                }}
+              />
+            </span>
           </div>
           {ready ? (
             <>
@@ -379,12 +375,12 @@ export default function OnboardingPage() {
                   padding: '15px 44px',
                   borderRadius: 16,
                   border: 'none',
-                  background: '#0066cc',
+                  background: '#5BBA6F',
                   color: '#fff',
                   fontSize: 16,
                   fontWeight: 800,
                   cursor: 'pointer',
-                  boxShadow: '0 6px 16px rgba(0,102,204,0.28)',
+                  boxShadow: '0 4px 0 #418550',
                   fontFamily: 'inherit',
                   animation: 'nodingo-modal-in 280ms ease both',
                 }}

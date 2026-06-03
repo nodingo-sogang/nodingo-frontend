@@ -1,19 +1,19 @@
 :root {
-  /* Brand */
-  --color-primary: #0066cc;
-  --color-primary-focus: #0071e3;
-  --color-primary-on-dark: #2997ff;
+  /* Brand — 메인 앱(딩고 새내기 티어)과 동일한 초록 계열 */
+  --color-primary: #5BBA6F;
+  --color-primary-focus: #4FA85E;
+  --color-primary-on-dark: #7BCF91;
 
-  /* Surfaces */
+  /* Surfaces — 따뜻한 크림 톤 */
   --color-canvas: #ffffff;
-  --color-parchment: #f5f5f7;
+  --color-parchment: #faf7f1;
   --color-surface-black: #000000;
   --color-surface-tile-1: #272729;
   --color-surface-tile-2: #2a2a2c;
 
   /* Text */
-  --color-ink: #1d1d1f;
-  --color-muted: #7a7a7a;
+  --color-ink: #0f1115;
+  --color-muted: #6b6b66;
   --color-body-on-dark: #ffffff;
 
   /* Node type colors */
@@ -24,7 +24,7 @@
   --color-node-place: #ff453a;
 
   /* Borders */
-  --color-hairline: #e0e0e0;
+  --color-hairline: #efeeea;
 
   /* Semantic */
   --color-success: #34c759;
