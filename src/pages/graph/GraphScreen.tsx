@@ -208,26 +208,19 @@ export default function GraphScreen({
 
   const tabs = tabsData?.tabs ?? (forceMock ? MOCK_TABS.tabs : []);
 
-  // 백엔드 추천은 그날 뉴스 키워드라 특정 이슈(예: 선거철 정치)로 쏠릴 수 있다.
-  // persona별로 라운드로빈 추출해 다양성을 확보한 뒤 상위 N개만 노출 → 한 분야 도배 완화 + 탭바 정돈.
-  const displayTabs = useMemo(() => {
-    if (tabs.length <= MAX_TABS) return tabs;
-    const groups = new Map<string, number[]>(); // persona -> 원본 인덱스 큐
-    tabs.forEach((t, i) => {
-      const k = t.persona || 'ETC';
-      if (!groups.has(k)) groups.set(k, []);
-      groups.get(k)!.push(i);
+  // 추천 탭이 많을 때 탭바가 혼잡해지지 않도록 백엔드 순서(점수순) 그대로 상위 N개만 노출.
+  const displayTabs = useMemo(() => tabs.slice(0, MAX_TABS), [tabs]);
+
+  // 노출된 탭에 등장하는 persona만 모아 색상 범례로 보여준다(중복 제거, 등장 순서 유지).
+  const legendPersonas = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    displayTabs.forEach(t => {
+      const p = t.persona || '';
+      if (p && !seen.has(p)) { seen.add(p); out.push(p); }
     });
-    const queues = [...groups.values()];
-    const picked: number[] = [];
-    let g = 0;
-    while (picked.length < tabs.length && queues.some(q => q.length)) {
-      const q = queues[g % queues.length];
-      if (q.length) picked.push(q.shift()!);
-      g++;
-    }
-    return picked.slice(0, MAX_TABS).map(i => tabs[i]);
-  }, [tabs]);
+    return out;
+  }, [displayTabs]);
 
   const graphQueries = useQueries({
     queries: displayTabs.map(tab => ({
@@ -706,6 +699,26 @@ export default function GraphScreen({
           {isLiveData ? 'LIVE' : 'MOCK'}
         </span>
       </div>
+
+      {!tabsLoading && legendPersonas.length > 0 && (
+        <div style={{
+          display: 'flex', gap: 12, padding: '0 16px 8px', flexShrink: 0,
+          overflowX: 'auto', scrollbarWidth: 'none', background: '#FFFFFF',
+        }}>
+          {legendPersonas.map(p => (
+            <span key={p} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0,
+              fontSize: 11, fontWeight: 700, color: '#6B6B66',
+            }}>
+              <span style={{
+                width: 9, height: 9, borderRadius: '50%',
+                background: personaStrokeColor(p),
+              }} />
+              {PERSONA_LABEL[p as UserPersona] ?? p}
+            </span>
+          ))}
+        </div>
+      )}
 
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
