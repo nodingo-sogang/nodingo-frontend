@@ -186,6 +186,16 @@
   to { transform: rotate(360deg); }
 }
 
+/* 라이브 그래프 첫 로딩 스피너 (온보딩 게이트 prefetch 미적중 시) */
+.graphBootSpinner {
+  width: 44px;
+  height: 44px;
+  border: 3px solid #EAE7E0;
+  border-top-color: #3FA66A;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
 /* FABs */
 .recenterFab {
   position: absolute;

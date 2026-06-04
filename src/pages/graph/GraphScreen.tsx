@@ -199,10 +199,12 @@ export default function GraphScreen({
       return graphApi.getTabs().then(r => { setIsLiveData(true); return r.data.data; })
         .catch(() => { setIsLiveData(false); return MOCK_TABS; });
     },
-    placeholderData: MOCK_TABS,
+    // 라이브 모드에선 mock placeholder를 깔지 않는다 → 실데이터(또는 prefetch 캐시)만 노출.
+    // 캐시에 실데이터가 있으면 즉시, 없으면 스켈레톤(아래) → mock 깜빡임 제거.
+    placeholderData: forceMock ? MOCK_TABS : undefined,
   });
 
-  const tabs = tabsData?.tabs ?? MOCK_TABS.tabs;
+  const tabs = tabsData?.tabs ?? (forceMock ? MOCK_TABS.tabs : []);
 
   const graphQueries = useQueries({
     queries: tabs.map(tab => ({
@@ -213,11 +215,15 @@ export default function GraphScreen({
           .then(r => r.data.data)
           .catch(() => MOCK_GRAPH[tab.keyword_id] ?? MOCK_GRAPH[1]);
       },
-      placeholderData: MOCK_GRAPH[tab.keyword_id] ?? MOCK_GRAPH[1],
+      placeholderData: forceMock ? (MOCK_GRAPH[tab.keyword_id] ?? MOCK_GRAPH[1]) : undefined,
     })),
   });
 
   const graphLoading = graphQueries.some(q => q.isLoading && !q.data);
+
+  // 라이브 첫 진입(재로그인 등 prefetch 캐시 없음): 탭/그래프 실데이터가 준비되기 전 상태.
+  // 이때 mock 대신 스켈레톤을 보여줘 mock 깜빡임을 없앤다. (forceMock=preview는 해당 없음)
+  const liveBooting = !forceMock && (!tabsData || (tabs.length > 0 && graphQueries.some(q => !q.data)));
 
   const { allNodes, allEdges, tabNodeIds } = useMemo(() => {
     const nodeMap = new Map<number, GraphNodeResponse>();
@@ -614,6 +620,19 @@ export default function GraphScreen({
       display: 'flex', flexDirection: 'column', height: '100%',
       position: 'relative', background: '#FFFFFF', overflow: 'hidden',
     }}>
+      {liveBooting && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 200,
+          background: '#FFFFFF',
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: 14,
+        }}>
+          <div className={styles.graphBootSpinner} />
+          <div style={{ fontSize: 13.5, fontWeight: 800, color: '#6B6B66' }}>
+            오늘의 그래프를 불러오는 중…
+          </div>
+        </div>
+      )}
       <div style={{
         display: 'flex', gap: 8, padding: '10px 16px 8px',
         overflowX: 'auto', flexShrink: 0, scrollbarWidth: 'none',
