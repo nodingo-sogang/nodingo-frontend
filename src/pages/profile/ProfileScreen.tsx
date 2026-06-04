@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { tierOf } from '../../mocks';
 import type { UserGame, Badge } from '../../types/game';
 import { useAuthStore } from '../../store/authStore';
@@ -32,10 +33,17 @@ function BadgeTile({ badge }: BadgeTileProps) {
 }
 
 export default function ProfileScreen({ userGame }: ProfileScreenProps) {
-  const { logout } = useAuthStore();
+  const { logout, withdraw } = useAuthStore();
   const tier = tierOf(userGame.level);
+  const [confirmWithdraw, setConfirmWithdraw] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
 
   const earnedCount = userGame.badges.filter(b => b.earned).length;
+
+  const handleWithdraw = async () => {
+    setWithdrawing(true);
+    await withdraw(); // 성공/실패 무관 로컬 정리 → 인증 가드가 /login 으로 보냄
+  };
 
   return (
     <div style={{
@@ -111,6 +119,66 @@ export default function ProfileScreen({ userGame }: ProfileScreenProps) {
       }}>
         로그아웃
       </button>
+
+      <button onClick={() => setConfirmWithdraw(true)} style={{
+        margin: '10px 16px 0',
+        width: 'calc(100% - 32px)', padding: 12, borderRadius: 14,
+        border: 'none', background: 'transparent', color: '#B0463C',
+        fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
+        fontFamily: 'Pretendard, -apple-system, system-ui, sans-serif',
+      }}>
+        회원 탈퇴
+      </button>
+
+      {confirmWithdraw && (
+        <div
+          onClick={() => !withdrawing && setConfirmWithdraw(false)}
+          style={{
+            position: 'absolute', inset: 0, zIndex: 300,
+            background: 'rgba(15,17,21,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 24,
+          }}
+        >
+          <div onClick={e => e.stopPropagation()} style={{
+            width: '100%', maxWidth: 360, background: '#FFFFFF',
+            borderRadius: 24, padding: '24px 22px 18px', textAlign: 'center',
+            animation: 'nodingo-modal-in 280ms cubic-bezier(.2,.7,.2,1)',
+          }}>
+            <div style={{ fontSize: 40, marginBottom: 10 }}>⚠️</div>
+            <div style={{ fontSize: 19, fontWeight: 900, color: '#0F1115', marginBottom: 8 }}>
+              정말 탈퇴하시겠어요?
+            </div>
+            <p style={{ fontSize: 13, color: '#6B6B66', lineHeight: 1.55, marginBottom: 20 }}>
+              네이버 연동이 해제되고, <b>딩고의 모든 기록(레벨·뱃지·스크랩·친구)이 영구 삭제</b>됩니다.
+              <br />이 작업은 되돌릴 수 없어요.
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => setConfirmWithdraw(false)}
+                disabled={withdrawing}
+                style={{
+                  flex: 1, padding: 13, borderRadius: 14,
+                  border: '1.5px solid #E6E6E2', background: '#FFFFFF',
+                  fontSize: 14, fontWeight: 800, color: '#6B6B66', cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >취소</button>
+              <button
+                onClick={handleWithdraw}
+                disabled={withdrawing}
+                style={{
+                  flex: 1, padding: 13, borderRadius: 14, border: 'none',
+                  background: '#E04F4F', color: '#fff',
+                  fontSize: 14, fontWeight: 800,
+                  cursor: withdrawing ? 'default' : 'pointer', opacity: withdrawing ? 0.7 : 1,
+                  fontFamily: 'inherit',
+                }}
+              >{withdrawing ? '처리 중…' : '탈퇴하기'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
