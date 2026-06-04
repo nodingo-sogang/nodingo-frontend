@@ -1,23 +1,28 @@
 import { apiClient } from './client';
 import type { ApiResponse } from '../types';
-import type { Friend } from '../types/game';
+import type { FriendProfile } from '../types/game';
 
-// 친구 (초대 코드 방식) API — 백엔드 미구현 상태(요청서 docs/backend-api-requests.md 4번)
-// 현재는 스텁. 백엔드 준비되면 컴포넌트에서 try→catch(mock) 패턴으로 연결만 하면 됨.
+// 친구 API — 백엔드 모델: 닉네임 검색 → 친구 요청 → 수락 (양방향)
 export const friendApi = {
-  // 내 초대 코드 조회 (없으면 서버가 생성해서 반환)
-  getMyInviteCode: () =>
-    apiClient.get<ApiResponse<{ invite_code: string }>>('/api/users/me/invite-code'),
+  // 닉네임으로 유저 검색 (1명 반환)
+  searchByNickname: (nickname: string) =>
+    apiClient.get<ApiResponse<{ user: FriendProfile | null }>>('/api/users/search', {
+      params: { nickname },
+    }),
 
-  // 초대 코드로 친구 추가 (양방향)
-  addFriend: (inviteCode: string) =>
-    apiClient.post<ApiResponse<Friend>>('/api/users/friends', { invite_code: inviteCode }),
+  // 친구 요청 보내기
+  sendRequest: (targetUserId: number) =>
+    apiClient.post<ApiResponse<void>>('/api/friends/request', { target_user_id: targetUserId }),
 
-  // 내 친구 목록
+  // 받은 친구 요청 목록
+  getReceivedRequests: () =>
+    apiClient.get<ApiResponse<{ friends: FriendProfile[] }>>('/api/friends/received'),
+
+  // 친구 요청 수락
+  acceptRequest: (targetUserId: number) =>
+    apiClient.post<ApiResponse<void>>('/api/friends/accept', { target_user_id: targetUserId }),
+
+  // 내 친구 목록 (수락된)
   getFriends: () =>
-    apiClient.get<ApiResponse<{ friends: Friend[] }>>('/api/users/friends'),
-
-  // 친구 삭제
-  removeFriend: (userId: number) =>
-    apiClient.delete<ApiResponse<void>>(`/api/users/friends/${userId}`),
+    apiClient.get<ApiResponse<{ friends: FriendProfile[] }>>('/api/friends'),
 };
