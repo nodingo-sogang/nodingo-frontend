@@ -1,7 +1,37 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { MOCK_RANKING_FRIENDS, MOCK_RANKING_PERSONA, tierOf, xpForLevel } from '../../mocks';
 import FriendManageSheet from '../../components/social/FriendManageSheet';
+import { rankingApi } from '../../api/ranking';
+import type { RankingEntryResponse, RankingListResponse } from '../../types';
 import type { RankingEntry, UserGame } from '../../types/game';
+
+// 서버 응답(snake_case) → 화면용 RankingEntry 매핑
+function toEntry(e: RankingEntryResponse): RankingEntry {
+  return {
+    rank: e.rank,
+    name: e.nickname,
+    avatar: '',
+    level: e.level,
+    weekXp: e.week_xp,
+    persona: e.persona,
+    isMe: e.is_me ?? e.me ?? false,
+  };
+}
+
+type MappedRanking = { entries: RankingEntry[]; myEntry: RankingEntry | null };
+
+function mapRanking(data: RankingListResponse | null): MappedRanking {
+  const entries = (data?.entries ?? []).map(toEntry);
+  const myEntry = data?.my_entry ? toEntry(data.my_entry) : null;
+  return { entries, myEntry };
+}
+
+// 라이브 실패(미로그인 등) 시 mock 폴백
+function mockRanking(tab: 'friends' | 'persona'): MappedRanking {
+  const entries = tab === 'friends' ? MOCK_RANKING_FRIENDS : MOCK_RANKING_PERSONA;
+  return { entries, myEntry: entries.find(e => e.isMe) ?? null };
+}
 
 const PODIUM_COLORS = ['#F5B82E', '#C0C0C0', '#CD7F32'];
 const PODIUM_HEIGHTS = [84, 64, 52];
@@ -180,10 +210,20 @@ export default function RankingScreen({ accentColor, userGame }: RankingScreenPr
   const [toast, setToast] = useState('');
   const [mapUser, setMapUser] = useState<RankingEntry | null>(null);
   const [friendSheet, setFriendSheet] = useState(false);
-  const entries = rankTab === 'friends' ? MOCK_RANKING_FRIENDS : MOCK_RANKING_PERSONA;
+  // 실 API 조회 (실패 시 mock 폴백)
+  const { data: ranking } = useQuery<MappedRanking>({
+    queryKey: ['ranking', rankTab],
+    queryFn: () =>
+      rankingApi.getRanking(rankTab === 'friends' ? 'FRIENDS' : 'PERSONA')
+        .then(r => mapRanking(r.data.data))
+        .catch(() => mockRanking(rankTab)),
+    placeholderData: () => mockRanking(rankTab),
+  });
+
+  const entries = ranking?.entries ?? [];
   const top3 = entries.filter(e => e.rank <= 3);
   const rest = entries.filter(e => e.rank > 3 && !e.isMe);
-  const me = entries.find(e => e.isMe);
+  const me = ranking?.myEntry ?? entries.find(e => e.isMe);
   const myTier = tierOf(userGame.level);
   const neededXp = xpForLevel(userGame.level);
   const weekXp = me?.weekXp ?? userGame.xp;

@@ -244,3 +244,25 @@ export interface UserProgressResponse {
   total_count: number;
   progress_rate: number;
 }
+
+// ─── Ranking ───────────────────────────────────────────────────────────────────
+
+/** GET /api/users/ranking 항목 */
+export interface RankingEntryResponse {
+  rank: number;
+  nickname: string;
+  level: number;
+  week_xp: number;
+  persona?: string;
+  /** 백엔드 boolean 직렬화에 따라 is_me 또는 me 로 올 수 있어 둘 다 수용 */
+  is_me?: boolean;
+  me?: boolean;
+}
+
+/** GET /api/users/ranking?scope=FRIENDS|PERSONA */
+export interface RankingListResponse {
+  scope: string;
+  period: string;
+  entries: RankingEntryResponse[];
+  my_entry: RankingEntryResponse | null;
+}
