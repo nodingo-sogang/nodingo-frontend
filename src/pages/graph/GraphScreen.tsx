@@ -409,7 +409,13 @@ export default function GraphScreen({
     if (displayNodes.length === 0) return;
     simulationRef.current?.stop();
 
+    // 이미 배치돼 있던 노드는 직전 위치에서 출발 → 탭/데이터 갱신 시 화면이 튀지 않게.
+    const prevPos = new Map(simNodesRef.current.map(n => [n.id, { x: n.x, y: n.y }]));
     const simNodes: SimNode[] = displayNodes.map((n, index) => {
+      const seed = prevPos.get(n.id);
+      if (seed && seed.x != null && seed.y != null) {
+        return { ...n, x: seed.x, y: seed.y };
+      }
       const angle = (Math.PI * 2 * index) / Math.max(1, displayNodes.length);
       const radius = 70 + (index % 4) * 38;
       return {
@@ -425,6 +431,12 @@ export default function GraphScreen({
       weight: edge.weight,
     }));
 
+    const clamp = (node: SimNode) => {
+      const pad = nodeDot(node.score) + 24;
+      node.x = Math.max(pad, Math.min(SVG_W - pad, node.x ?? SVG_W / 2));
+      node.y = Math.max(46, Math.min(SVG_H - 88, node.y ?? SVG_H / 2));
+    };
+
     const sim = forceSimulation<SimNode>(simNodes)
       .force('link', forceLink<SimNode, { source: number | SimNode; target: number | SimNode; weight: number }>(simEdges)
         .id(node => node.id)
@@ -434,44 +446,22 @@ export default function GraphScreen({
       .force('center', forceCenter<SimNode>(SVG_W / 2, SVG_H / 2 - 18).strength(0.34))
       .force('x', forceX<SimNode>(SVG_W / 2).strength(0.055))
       .force('y', forceY<SimNode>(SVG_H / 2 - 18).strength(0.07))
-      .force('collide', forceCollide<SimNode>(node => layoutRadius(node)).strength(0.92))
-      .stop();
+      .force('collide', forceCollide<SimNode>(node => layoutRadius(node)).strength(0.92));
 
-    for (let i = 0; i < 260; i++) sim.tick();
-
-    for (let pass = 0; pass < 2; pass++) {
-      for (let i = 0; i < simNodes.length; i++) {
-        for (let j = i + 1; j < simNodes.length; j++) {
-          const a = simNodes[i];
-          const b = simNodes[j];
-          const min = layoutRadius(a) + layoutRadius(b) - 4;
-          const dx = (b.x ?? 0) - (a.x ?? 0);
-          const dy = (b.y ?? 0) - (a.y ?? 0);
-          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          if (dist < min) {
-            const push = (min - dist) / 2;
-            const ux = dx / dist;
-            const uy = dy / dist;
-            a.x = (a.x ?? SVG_W / 2) - ux * push;
-            a.y = (a.y ?? SVG_H / 2) - uy * push;
-            b.x = (b.x ?? SVG_W / 2) + ux * push;
-            b.y = (b.y ?? SVG_H / 2) + uy * push;
-          }
-        }
-      }
-    }
-
-    simNodes.forEach(node => {
-      const pad = nodeDot(node.score) + 24;
-      node.x = Math.max(pad, Math.min(SVG_W - pad, node.x ?? SVG_W / 2));
-      node.y = Math.max(46, Math.min(SVG_H - 88, node.y ?? SVG_H / 2));
+    // 라이브 시뮬레이션: 매 tick마다 위치를 갱신해 노드끼리 실시간으로 밀고 당긴다.
+    // effect는 graphSignature(내용 기반)로만 게이팅 → setPositions 리렌더로는 재실행되지 않아 무한 루프가 없다.
+    // 알파가 식으면 d3가 자동으로 tick을 멈춰 CPU도 정리된다(드래그 시 alphaTarget로 재가열).
+    sim.on('tick', () => {
+      simNodes.forEach(clamp);
+      const map = new Map<number, { x: number; y: number }>();
+      simNodes.forEach(n => map.set(n.id, { x: n.x!, y: n.y! }));
+      setPositions(map);
     });
 
     simNodesRef.current = simNodes;
-    const map = new Map<number, { x: number; y: number }>();
-    simNodes.forEach(n => map.set(n.id, { x: n.x!, y: n.y! }));
-    setPositions(map);
-    simulationRef.current = null;
+    simulationRef.current = sim;
+
+    return () => { sim.stop(); };
     // graphSignature(내용 기반 문자열)로만 게이팅 — 참조만 바뀐 리렌더에선 재실행하지 않음.
     // displayNodes/displayEdges/isLocked 는 같은 내용이면 동일 시그니처라 stale 아님.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -596,6 +586,19 @@ export default function GraphScreen({
       dragNodeRef.current = null;
     }
   }, [isLocked, onNodeExplore, forceMock]);
+
+  // 노드 드래그 시작: 해당 sim 노드를 고정(fx/fy)하고 시뮬레이션을 재가열 → 잡고 끌면 주변이 출렁인다.
+  const onNodePointerDown = useCallback((e: React.PointerEvent<SVGCircleElement>, node: GraphNodeResponse) => {
+    e.stopPropagation();
+    const sn = simNodesRef.current.find(n => n.id === node.id);
+    if (!sn) return;
+    dragNodeRef.current = sn;
+    dragMoved.current = false;
+    sn.fx = sn.x;
+    sn.fy = sn.y;
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    simulationRef.current?.alphaTarget(0.3).restart();
+  }, []);
 
   // ── Daily goal indicator ──────────────────────────────────────────────────────
 
@@ -875,6 +878,7 @@ export default function GraphScreen({
                     <circle cx={p.x} cy={p.y} r={hitR}
                       fill="transparent"
                       style={{ cursor: locked ? 'not-allowed' : 'grab' }}
+                      onPointerDown={e => onNodePointerDown(e, node)}
                       onPointerUp={e => onNodePointerUp(e, node)}
                     />
                     {locked ? (
