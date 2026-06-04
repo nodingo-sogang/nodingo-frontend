@@ -7,6 +7,7 @@ interface AuthState {
   isOnboarded: boolean;
   login: (accessToken: string, refreshToken: string, onboarded?: boolean) => void;
   logout: () => Promise<void>;
+  withdraw: () => Promise<void>;
   setOnboarded: () => void;
 }
 
@@ -27,6 +28,17 @@ export const useAuthStore = create<AuthState>((set) => ({
       await authApi.logout();
     } catch {
       // ignore — clear locally regardless
+    }
+    tokenStorage.clear();
+    localStorage.removeItem(ONBOARDED_KEY);
+    set({ isAuthenticated: false, isOnboarded: false });
+  },
+
+  withdraw: async () => {
+    try {
+      await authApi.withdraw();
+    } catch {
+      // 실패해도 로컬은 정리 (재시도 시 토큰 만료 등)
     }
     tokenStorage.clear();
     localStorage.removeItem(ONBOARDED_KEY);
