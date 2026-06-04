@@ -339,7 +339,25 @@ export default function GraphScreen({
   });
 
   // 요약 본문/제목은 첫 페이지 기준, 뉴스는 모든 페이지 누적(중복 id 제거)
-  const nodeSummary: NodeSummaryResponse | null = summaryPages?.pages[0] ?? null;
+  // /summaries는 RecommendKeyword(탭 키워드)에만 있어 이웃 노드는 404 → 비어 온다.
+  // 이때 getGraphData가 이미 내려준 노드 인라인 summary(GraphNodeResponse.summary)로 폴백.
+  const fetchedSummary = summaryPages?.pages[0] ?? null;
+  const nodeSummary = useMemo<NodeSummaryResponse | null>(() => {
+    if (fetchedSummary && fetchedSummary.summary && fetchedSummary.summary.trim().length > 0) {
+      return fetchedSummary;
+    }
+    if (selectedNodeId === null) return fetchedSummary;
+    const node = displayNodes.find(n => n.id === selectedNodeId);
+    if (!node || !node.summary || node.summary.trim().length === 0) return fetchedSummary;
+    return {
+      keyword_id: node.id,
+      word: node.label,
+      persona: node.persona,
+      summary: node.summary,
+      has_next: false,
+      news: [],
+    };
+  }, [fetchedSummary, selectedNodeId, displayNodes]);
   const accumulatedNews = useMemo<NewsItemBrief[]>(() => {
     const seen = new Set<number>();
     const list: NewsItemBrief[] = [];
@@ -629,9 +647,13 @@ export default function GraphScreen({
     ? userGame.completedQuizzes.includes(nodeSummary.word)
     : false;
   // 서버가 준 실제 뉴스(전 페이지 누적)가 있으면 그걸 쓰고, 없으면 합성 fallback
+  // 라이브에선 실제 뉴스만 노출. 없으면(이웃 노드 인라인 폴백 등) 합성 가짜 뉴스(example.com) 대신 빈 상태.
+  // 합성 뉴스는 mock/preview 데모용으로만 사용.
   const nodeNews = useMemo(
-    () => (accumulatedNews.length > 0 ? accumulatedNews : newsForSummary(nodeSummary ?? null)),
-    [accumulatedNews, nodeSummary],
+    () => (accumulatedNews.length > 0
+      ? accumulatedNews
+      : (forceMock ? newsForSummary(nodeSummary ?? null) : [])),
+    [accumulatedNews, nodeSummary, forceMock],
   );
 
   return (
