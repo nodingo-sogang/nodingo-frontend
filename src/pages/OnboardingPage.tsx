@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { userApi } from '../api/user';
+import { graphApi } from '../api/graph';
 import { useAuthStore } from '../store/authStore';
 import type { UserPersona, KeywordResponse } from '../types';
 import { PERSONA_LABEL } from '../types';
@@ -24,6 +25,7 @@ const DINGO_IMG = '/assets/characters/tier1_새내기.png';
 
 export default function OnboardingPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { setOnboarded } = useAuthStore();
 
   const [step, setStep] = useState<Step>('persona');
@@ -119,6 +121,28 @@ export default function OnboardingPage() {
     const t = setTimeout(() => setReady(true), 20000);
     return () => clearTimeout(t);
   }, [submitted, ready]);
+
+  // 입장 준비되면 그래프 데이터(탭 + 각 탭 노드)를 미리 받아 캐시에 넣어둠.
+  // → /graph 진입 시 GraphScreen 쿼리가 캐시에서 즉시 채워져 mock 깜빡임 없이 실데이터로 바로 보임.
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const tabsRes = await graphApi.getTabs();
+        if (cancelled) return;
+        const tabList = tabsRes.data.data;
+        queryClient.setQueryData(['tabs'], tabList);
+        await Promise.all((tabList?.tabs ?? []).map(async (t) => {
+          try {
+            const g = await graphApi.getGraphData(t.keyword_id);
+            if (!cancelled) queryClient.setQueryData(['graph', t.keyword_id], g.data.data);
+          } catch { /* 개별 탭 실패는 무시 (GraphScreen이 폴백) */ }
+        }));
+      } catch { /* tabs 실패 시 GraphScreen이 알아서 로딩 */ }
+    })();
+    return () => { cancelled = true; };
+  }, [ready, queryClient]);
 
   const enterMain = () => {
     setOnboarded();
