@@ -7,13 +7,15 @@ import {
 } from 'd3-force';
 import { graphApi } from '../../api/graph';
 import { FogLayer, UnlockAnimation } from '../../components/game/FogOverlay';
-import type { GraphNodeResponse, NodeSummaryResponse, NewsItemBrief } from '../../types';
+import type { GraphNodeResponse, NodeSummaryResponse, NewsItemBrief, UserPersona } from '../../types';
+import { PERSONA_LABEL } from '../../types';
 import type { UserGame } from '../../types/game';
 import { MOCK_TABS, MOCK_GRAPH, MOCK_SUMMARIES, NODE_UNLOCK_LEVELS, tierOf } from '../../mocks';
 import styles from '../GraphPage.module.css';
 
 const SVG_W = 500;
 const SVG_H = 540;
+const MAX_TABS = 9; // 탭바에 노출할 최대 추천 키워드 수 (persona 다양성 유지하며 캡)
 
 const LABEL_TO_LOCK_KEY: Record<string, string> = {
   GraphRAG: 'graphrag',
@@ -206,8 +208,29 @@ export default function GraphScreen({
 
   const tabs = tabsData?.tabs ?? (forceMock ? MOCK_TABS.tabs : []);
 
+  // 백엔드 추천은 그날 뉴스 키워드라 특정 이슈(예: 선거철 정치)로 쏠릴 수 있다.
+  // persona별로 라운드로빈 추출해 다양성을 확보한 뒤 상위 N개만 노출 → 한 분야 도배 완화 + 탭바 정돈.
+  const displayTabs = useMemo(() => {
+    if (tabs.length <= MAX_TABS) return tabs;
+    const groups = new Map<string, number[]>(); // persona -> 원본 인덱스 큐
+    tabs.forEach((t, i) => {
+      const k = t.persona || 'ETC';
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k)!.push(i);
+    });
+    const queues = [...groups.values()];
+    const picked: number[] = [];
+    let g = 0;
+    while (picked.length < tabs.length && queues.some(q => q.length)) {
+      const q = queues[g % queues.length];
+      if (q.length) picked.push(q.shift()!);
+      g++;
+    }
+    return picked.slice(0, MAX_TABS).map(i => tabs[i]);
+  }, [tabs]);
+
   const graphQueries = useQueries({
-    queries: tabs.map(tab => ({
+    queries: displayTabs.map(tab => ({
       queryKey: ['graph', tab.keyword_id],
       queryFn: () => {
         if (forceMock) return Promise.resolve(MOCK_GRAPH[tab.keyword_id] ?? MOCK_GRAPH[1]);
@@ -223,7 +246,7 @@ export default function GraphScreen({
 
   // 라이브 첫 진입(재로그인 등 prefetch 캐시 없음): 탭/그래프 실데이터가 준비되기 전 상태.
   // 이때 mock 대신 스켈레톤을 보여줘 mock 깜빡임을 없앤다. (forceMock=preview는 해당 없음)
-  const liveBooting = !forceMock && (!tabsData || (tabs.length > 0 && graphQueries.some(q => !q.data)));
+  const liveBooting = !forceMock && (!tabsData || (displayTabs.length > 0 && graphQueries.some(q => !q.data)));
 
   const { allNodes, allEdges, tabNodeIds } = useMemo(() => {
     const nodeMap = new Map<number, GraphNodeResponse>();
@@ -231,7 +254,7 @@ export default function GraphScreen({
     const edges: { source: number; target: number; weight: number }[] = [];
     const tabNodeIds = new Map<number, Set<number>>();
 
-    tabs.forEach((tab, i) => {
+    displayTabs.forEach((tab, i) => {
       const data = graphQueries[i]?.data;
       if (!data) return;
       const ids = new Set<number>();
@@ -243,7 +266,7 @@ export default function GraphScreen({
       });
     });
     return { allNodes: [...nodeMap.values()], allEdges: edges, tabNodeIds };
-  }, [tabs, graphQueries]);
+  }, [displayTabs, graphQueries]);
 
   const { displayNodes, displayEdges, dynamicUnlockLevels } = useMemo(() => {
     const degree = new Map<number, number>();
@@ -642,24 +665,34 @@ export default function GraphScreen({
           ? Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className={styles.tabSkeleton} />
             ))
-          : tabs.map(tab => {
+          : displayTabs.map(tab => {
               const active = highlightKeywordId === tab.keyword_id;
+              // persona별 색상(그래프 노드와 동일 체계)으로 분야 구분: 정치/문화 등이 색으로 보이게.
+              const persona = tab.persona || '';
+              const soft = personaSoftColor(persona);
+              const stroke = personaStrokeColor(persona);
               return (
                 <button
                   key={tab.keyword_id}
+                  title={PERSONA_LABEL[persona as UserPersona] ?? undefined}
                   onClick={() => setHighlightKeywordId(prev => prev === tab.keyword_id ? null : tab.keyword_id)}
                   style={{
                     flexShrink: 0,
-                    padding: '7px 14px',
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    padding: '7px 13px',
                     borderRadius: 999,
-                    border: 'none',
-                    background: active ? '#0F1115' : '#F4F4F0',
-                    color: active ? '#FFFFFF' : '#6B6B66',
+                    border: `1.5px solid ${stroke}`,
+                    background: active ? stroke : soft,
+                    color: active ? '#FFFFFF' : '#4A4A45',
                     fontSize: 13,
-                    fontWeight: 700,
+                    fontWeight: active ? 800 : 700,
                     cursor: 'pointer',
                   }}
                 >
+                  <span style={{
+                    width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                    background: active ? '#FFFFFF' : stroke,
+                  }} />
                   {tab.word}
                 </button>
               );
