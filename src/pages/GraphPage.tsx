@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import HUD from '../components/game/HUD';
 import QuizModal from '../components/game/QuizModal';
@@ -12,6 +13,7 @@ import ProfileScreen from './profile/ProfileScreen';
 import { MOCK_SUMMARIES, MOCK_USER_GAME, NODE_UNLOCK_LEVELS, xpForLevel, tierOf } from '../mocks';
 import { USE_MOCK } from '../api/config';
 import { gameApi } from '../api/game';
+import { scrapApi } from '../api/scrap';
 import type { UserGame, Badge, ReceiptData } from '../types/game';
 import type { NodeSummaryResponse, BadgeResponse } from '../types';
 
@@ -213,10 +215,30 @@ function fallbackNews(summary: NodeSummaryResponse | undefined, item: ScrappedKe
 function ScrapScreen({
   items,
   onOpen,
+  forceMock,
 }: {
   items: ScrappedKeyword[];
   onOpen: (item: ScrappedKeyword) => void;
+  forceMock: boolean;
 }) {
+  // 서버에 저장된 스크랩 보관함 (영속). 실패/미로그인 시 로컬 세션 스크랩(items)로 폴백.
+  const { data: serverItems } = useQuery<ScrappedKeyword[]>({
+    queryKey: ['scrapSummaries'],
+    queryFn: () =>
+      scrapApi.getScrapSummaries()
+        .then(r => (r.data.data?.content ?? []).map(s => ({
+          id: s.keyword_id,
+          label: s.word,
+          persona: s.persona,
+          summary: s.summary,
+        })))
+        .catch(() => [] as ScrappedKeyword[]),
+    enabled: !forceMock,
+  });
+
+  // 서버 스크랩이 있으면 그것, 없으면 로컬(이번 세션 스크랩) 표시
+  const list = serverItems && serverItems.length > 0 ? serverItems : items;
+
   return (
     <div style={{
       height: '100%',
@@ -246,7 +268,7 @@ function ScrapScreen({
         </div>
       </div>
 
-      {items.length === 0 ? (
+      {list.length === 0 ? (
         <div style={{
           marginTop: 24,
           padding: '34px 18px',
@@ -263,7 +285,7 @@ function ScrapScreen({
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {items.map(item => {
+          {list.map(item => {
             const summary = MOCK_SUMMARIES[item.id];
             const news = fallbackNews(summary, item);
             return (
@@ -595,6 +617,7 @@ export default function GraphPage() {
   const scrapContent = (
     <ScrapScreen
       items={scrappedKeywords}
+      forceMock={forceMock}
       onOpen={(item) => {
         setTab('graph');
         void item;
