@@ -266,3 +266,20 @@ export interface RankingListResponse {
   entries: RankingEntryResponse[];
   my_entry: RankingEntryResponse | null;
 }
+
+// ─── Badges ────────────────────────────────────────────────────────────────────
+
+/** GET /api/users/badges 항목 */
+export interface BadgeResponse {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  condition: string;
+  earned: boolean;
+  earned_at: string | null;
+}
+
+export interface BadgeListResponse {
+  badges: BadgeResponse[];
+}

@@ -13,7 +13,20 @@ import { MOCK_SUMMARIES, MOCK_USER_GAME, NODE_UNLOCK_LEVELS, xpForLevel, tierOf 
 import { USE_MOCK } from '../api/config';
 import { gameApi } from '../api/game';
 import type { UserGame, Badge, ReceiptData } from '../types/game';
-import type { NodeSummaryResponse } from '../types';
+import type { NodeSummaryResponse, BadgeResponse } from '../types';
+
+// 서버 뱃지 응답 → 화면용 Badge
+function toBadge(b: BadgeResponse): Badge {
+  return {
+    id: b.id,
+    name: b.name,
+    category: b.category as Badge['category'],
+    description: b.description,
+    condition: b.condition,
+    earned: b.earned,
+    earnedAt: b.earned_at ?? undefined,
+  };
+}
 
 function checkBadges(updated: UserGame): Badge | null {
   const conditions: Array<[string, boolean]> = [
@@ -398,12 +411,14 @@ export default function GraphPage() {
   const syncGameFromServer = useCallback(async (suppressReward = false) => {
     if (forceMock) return;
     try {
-      const [profileRes, progressRes] = await Promise.all([
+      const [profileRes, progressRes, badgesRes] = await Promise.all([
         gameApi.getProfile(),
         gameApi.getProgress(),
+        gameApi.getBadges().catch(() => null), // 뱃지 미배포여도 나머진 반영
       ]);
       const profile = profileRes.data.data;
       const progress = progressRes.data.data;
+      const serverBadges = badgesRes?.data.data?.badges;
       if (profile && suppressReward) {
         prevLevelRef.current = profile.user_game.level;
       }
@@ -415,6 +430,8 @@ export default function GraphPage() {
         dailyGoal: profile?.daily_goals.quizzes_required ?? prev.dailyGoal,
         dailyProgress: profile?.daily_goals.quizzes_completed ?? prev.dailyProgress,
         totalNodesExplored: progress?.explored_count ?? prev.totalNodesExplored,
+        // 뱃지는 서버가 판정·저장 → 서버 값으로 교체 (재발급 방지)
+        badges: serverBadges && serverBadges.length > 0 ? serverBadges.map(toBadge) : prev.badges,
       }));
     } catch {
       // 서버 미응답 시 현재 상태 유지
@@ -451,8 +468,9 @@ export default function GraphPage() {
     }
   }, [userGame.level]);
 
-  // Watch for badge conditions
+  // Watch for badge conditions (라이브는 서버가 뱃지를 판정·지급하므로 로컬 계산/팝업 비활성화 → 환영 뱃지 재발급 방지)
   useEffect(() => {
+    if (!forceMock) return;
     const badge = checkBadges(userGame);
     if (badge) {
       setUserGame(prev => ({
