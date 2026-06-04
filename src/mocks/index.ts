@@ -5,7 +5,7 @@ import type {
   PersonaListResponse,
   KeywordListResponse,
 } from '../types';
-import type { Tier, Badge, UserGame, RankingEntry, Friend } from '../types/game';
+import type { Tier, Badge, UserGame, RankingEntry, FriendProfile } from '../types/game';
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 
@@ -644,13 +644,16 @@ export const MOCK_QUIZZES: Record<string, Array<{
   ],
 };
 
-// 친구 (초대 코드) — 백엔드 연결 전 골격용 mock
-export const MOCK_INVITE_CODE = 'NDG-7F3A';
+// 친구 (검색+요청/수락) — 라이브 실패 시 폴백용 mock
+export const MOCK_FRIENDS: FriendProfile[] = [
+  { user_id: 101, nickname: '찬우', level: 28, persona: '기술' },
+  { user_id: 102, nickname: '상운', level: 25, persona: '국제' },
+  { user_id: 103, nickname: '성민', level: 22, persona: '경제' },
+];
 
-export const MOCK_FRIENDS: Friend[] = [
-  { user_id: 101, name: '찬우', level: 28, persona: '기술' },
-  { user_id: 102, name: '상운', level: 25, persona: '국제' },
-  { user_id: 103, name: '성민', level: 22, persona: '경제' },
+export const MOCK_FRIEND_REQUESTS: FriendProfile[] = [
+  { user_id: 201, nickname: '지민', level: 14, persona: '사회' },
+  { user_id: 202, nickname: '도윤', level: 9, persona: '경제' },
 ];
 
 export const MOCK_RANKING_FRIENDS: RankingEntry[] = [

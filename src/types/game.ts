@@ -49,10 +49,10 @@ export interface ReceiptData {
   serial: string;
 }
 
-// 친구 (초대 코드 방식) — 백엔드 GET /api/users/friends 항목과 매핑
-export interface Friend {
+// 친구/검색 유저 — 백엔드 FriendProfileResponse / UserSearchResult 와 매핑
+export interface FriendProfile {
   user_id: number;
-  name: string;
+  nickname: string;
   level: number;
   persona?: string;
 }
