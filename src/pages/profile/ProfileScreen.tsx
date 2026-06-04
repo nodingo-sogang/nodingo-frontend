@@ -37,12 +37,21 @@ export default function ProfileScreen({ userGame }: ProfileScreenProps) {
   const tier = tierOf(userGame.level);
   const [confirmWithdraw, setConfirmWithdraw] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
+  const [withdrawError, setWithdrawError] = useState('');
 
   const earnedCount = userGame.badges.filter(b => b.earned).length;
 
   const handleWithdraw = async () => {
     setWithdrawing(true);
-    await withdraw(); // 성공/실패 무관 로컬 정리 → 인증 가드가 /login 으로 보냄
+    setWithdrawError('');
+    try {
+      await withdraw(); // 성공 시 내부에서 /login 으로 전체 리로드
+    } catch (err) {
+      // 실패: 백엔드 에러 메시지를 그대로 노출 (리로드 안 함 → 원인 확인 가능)
+      setWithdrawing(false);
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setWithdrawError(msg || '탈퇴에 실패했어요. 잠시 후 다시 시도해주세요.');
+    }
   };
 
   return (
@@ -153,6 +162,16 @@ export default function ProfileScreen({ userGame }: ProfileScreenProps) {
               네이버 연동이 해제되고, <b>딩고의 모든 기록(레벨·뱃지·스크랩·친구)이 영구 삭제</b>됩니다.
               <br />이 작업은 되돌릴 수 없어요.
             </p>
+            {withdrawError && (
+              <div style={{
+                background: '#FCEBEB', color: '#C0392B', borderRadius: 12,
+                padding: '10px 12px', marginBottom: 16,
+                fontSize: 12, fontWeight: 700, lineHeight: 1.5, textAlign: 'left',
+                wordBreak: 'break-all',
+              }}>
+                {withdrawError}
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 10 }}>
               <button
                 onClick={() => setConfirmWithdraw(false)}

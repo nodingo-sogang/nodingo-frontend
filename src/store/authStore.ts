@@ -43,11 +43,9 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   withdraw: async () => {
-    try {
-      await authApi.withdraw();
-    } catch {
-      // 실패해도 로컬은 정리 (재시도 시 토큰 만료 등)
-    }
+    // 탈퇴 API가 성공했을 때만 로그아웃·리로드. 실패하면 throw → 호출부가 에러 표시.
+    // (실패를 삼키면 "헛탈퇴"로 오해 + 백엔드 에러가 가려짐)
+    await authApi.withdraw();
     clearLocalSession();
     set({ isAuthenticated: false, isOnboarded: false });
     window.location.href = '/login';
