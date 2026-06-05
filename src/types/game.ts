@@ -18,6 +18,10 @@ export interface Badge {
 }
 
 export interface UserGame {
+  /** 서버 닉네임 (/api/users/game 의 user_game.nickname) */
+  name: string;
+  /** 네이버 프로필 이미지 URL (없으면 티어 캐릭터로 폴백) */
+  profileImageUrl?: string | null;
   level: number;
   xp: number;
   streak: number;
@@ -49,10 +53,11 @@ export interface ReceiptData {
   serial: string;
 }
 
-// 친구/검색 유저 — 백엔드 FriendProfileResponse / UserSearchResult 와 매핑
+// 친구/검색 유저 — UI 모델 (서버 raw는 friend.ts 에서 정규화)
 export interface FriendProfile {
   user_id: number;
   nickname: string;
   level: number;
   persona?: string;
+  profileImageUrl?: string | null;
 }

@@ -25,6 +25,8 @@ interface UIQuiz {
   /** 0-based 정답 인덱스. live 는 제출 전까지 null */
   answer: number | null;
   source: { outlet: string; date: string; url?: string };
+  /** 이미 제출한 퀴즈 (목록 응답 solved). 선제 차단/완료 표시용 */
+  solved: boolean;
 }
 
 function mockQuizzes(nodeId: string): UIQuiz[] {
@@ -36,6 +38,7 @@ function mockQuizzes(nodeId: string): UIQuiz[] {
     options: item.options,
     answer: item.a,
     source: item.source,
+    solved: false,
   }));
 }
 
@@ -62,6 +65,8 @@ export default function QuizModal({
   const [submitting, setSubmitting] = useState(false);
   // 이미 제출한 퀴즈 (백엔드 400) — 정답/오답 대신 "이미 풀었어요" 안내
   const [alreadyDone, setAlreadyDone] = useState(false);
+  // live 응답이 성공했지만 퀴즈가 0개 (관련 뉴스 부족 등) — mock 대신 빈 상태 노출
+  const [noQuiz, setNoQuiz] = useState(false);
   const [phase, setPhase] = useState<'question' | 'answer' | 'result'>('question');
 
   // ── 퀴즈 목록 로드 (GET /api/graphs/nodes/{keywordId}/quizzes) ──────────────────
@@ -84,13 +89,19 @@ export default function QuizModal({
               date: quiz.source_date,
               url: quiz.source_url,
             },
+            solved: quiz.solved ?? false,
           })));
           setIsLive(true);
+        } else if (data) {
+          // 성공 응답이지만 퀴즈 0개 = 관련 뉴스 부족 등으로 미생성 → 빈 상태 (mock 폴백 금지)
+          setQuizzes([]);
+          setIsLive(true);
+          setNoQuiz(true);
         } else {
           setQuizzes(mockQuizzes(nodeId));
         }
       } catch {
-        // 서버 미응답 시 mock 으로 진행
+        // 서버 미응답(네트워크/5xx) 시에만 mock 으로 진행
         if (!cancelled) setQuizzes(mockQuizzes(nodeId));
       } finally {
         if (!cancelled) setLoading(false);
@@ -101,9 +112,15 @@ export default function QuizModal({
   }, [keywordId, forceMock]);
 
   const q = quizzes[current];
+  // 이미 푼 퀴즈는 클릭 없이도 정답/완료 영역을 바로 노출 (선제 표시)
+  const solved = !!q?.solved;
+  const showAnswerArea = phase === 'answer' || solved;
+  // 노드의 퀴즈를 이미 전부 푼 경우 — 결과 화면을 점수 대신 안내로 대체
+  const allSolved = quizzes.length > 0 && quizzes.every(x => x.solved);
 
   const handleSelect = async (idx: number) => {
-    if (phase !== 'question' || submitting || !q) return;
+    // 이미 푼 퀴즈는 클릭 자체를 막아 헛된 재제출(400) 호출 제거
+    if (phase !== 'question' || submitting || !q || q.solved) return;
     setSelected(idx);
 
     if (isLive && q.id != null) {
@@ -182,9 +199,13 @@ export default function QuizModal({
       }}>
         {loading || !q ? (
           <div style={{ padding: '48px 20px', textAlign: 'center' }}>
-            <div style={{ fontSize: 30, marginBottom: 12 }}>🧠</div>
-            <p style={{ fontSize: 14, fontWeight: 800, color: '#6B6B66' }}>
-              {loading ? '퀴즈를 불러오는 중…' : '퀴즈가 없습니다.'}
+            <div style={{ fontSize: 30, marginBottom: 12 }}>{loading ? '🧠' : noQuiz ? '🔒' : '🧠'}</div>
+            <p style={{ fontSize: 14, fontWeight: 800, color: '#6B6B66', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
+              {loading
+                ? '퀴즈를 불러오는 중…'
+                : noQuiz
+                  ? '관련 뉴스가 부족해\n아직 퀴즈가 없어요.'
+                  : '퀴즈가 없습니다.'}
             </p>
             {!loading && !q && (
               <button onClick={onClose} style={{
@@ -236,18 +257,18 @@ export default function QuizModal({
                   let bg = '#FFFFFF';
                   let border = '1.5px solid #E8E8E4';
                   let color = '#0F1115';
-                  if (phase === 'answer') {
+                  if (showAnswerArea) {
                     if (revealedAnswer !== null && i === revealedAnswer) { bg = '#E8F6EC'; border = '1.5px solid #5BBA6F'; color = '#1E8460'; }
                     else if (i === selected && alreadyDone) { bg = '#F4F4F0'; border = '1.5px solid #D8D8D2'; color = '#6B6B66'; }
                     else if (i === selected) { bg = '#FCEBEB'; border = '1.5px solid #FF6B6B'; color = '#D84A4A'; }
                   }
                   return (
-                    <button key={i} onClick={() => handleSelect(i)} disabled={submitting} style={{
+                    <button key={i} onClick={() => handleSelect(i)} disabled={submitting || solved} style={{
                       background: bg, border, borderRadius: 16,
                       padding: '13px 15px', textAlign: 'left',
                       fontSize: 14, color,
-                      cursor: phase === 'question' && !submitting ? 'pointer' : 'default',
-                      opacity: submitting && i !== selected ? 0.6 : 1,
+                      cursor: phase === 'question' && !submitting && !solved ? 'pointer' : 'default',
+                      opacity: solved ? 0.55 : (submitting && i !== selected ? 0.6 : 1),
                       transition: 'all 0.18s',
                       fontFamily: 'Pretendard, -apple-system, system-ui, sans-serif',
                       lineHeight: 1.4,
@@ -259,7 +280,7 @@ export default function QuizModal({
                 })}
               </div>
 
-              {phase === 'answer' && alreadyDone && (
+              {showAnswerArea && (alreadyDone || solved) && (
                 <div style={{
                   marginTop: 12, padding: '10px 12px', borderRadius: 12,
                   background: '#F4F4F0', color: '#6B6B66',
@@ -270,7 +291,7 @@ export default function QuizModal({
                 </div>
               )}
 
-              {phase === 'answer' && (
+              {showAnswerArea && (
                 <div style={{ marginTop: 12, fontSize: 11, color: '#6B6B66' }}>
                   출처: {q.source.outlet} · {q.source.date}
                   {q.source.url && (
@@ -293,7 +314,7 @@ export default function QuizModal({
                   fontSize: 14, cursor: 'pointer', fontWeight: 800,
                   fontFamily: 'Pretendard, -apple-system, system-ui, sans-serif',
                 }}>닫기</button>
-                {phase === 'answer' && (
+                {showAnswerArea && (
                   <button onClick={handleNext} style={{
                     flex: 2, padding: 13, borderRadius: 18, border: 'none',
                     background: accent, color: '#fff',
@@ -308,20 +329,32 @@ export default function QuizModal({
           </>
         ) : (
           <div style={{ padding: '28px 20px 24px' }}>
-            <div style={{ textAlign: 'center', padding: '16px 0 24px' }}>
-              <div style={{ fontSize: 52, marginBottom: 12 }}>
-                {correctCount === quizzes.length ? '🎉' : correctCount > 0 ? '🌟' : '💪'}
+            {allSolved ? (
+              <div style={{ textAlign: 'center', padding: '16px 0 24px' }}>
+                <div style={{ fontSize: 52, marginBottom: 12 }}>✅</div>
+                <p style={{ fontSize: 20, fontWeight: 900, color: '#0F1115', marginBottom: 6 }}>
+                  이미 다 푼 퀴즈예요
+                </p>
+                <p style={{ fontSize: 12, color: '#6B6B66' }}>
+                  이 노드의 퀴즈는 모두 완료했어요. 다른 노드를 탐험해보세요!
+                </p>
               </div>
-              <p style={{ fontSize: 20, fontWeight: 900, color: '#0F1115', marginBottom: 6 }}>
-                {correctCount} / {quizzes.length} 정답
-              </p>
-              <p style={{ fontSize: 30, fontWeight: 900, color: accent, marginBottom: 4 }}>
-                +{totalXp} XP
-              </p>
-              <p style={{ fontSize: 12, color: '#6B6B66' }}>
-                {isLive ? '뉴스 기반 퀴즈 보상 획득!' : '정답당 +20 XP 획득!'}
-              </p>
-            </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '16px 0 24px' }}>
+                <div style={{ fontSize: 52, marginBottom: 12 }}>
+                  {correctCount === quizzes.length ? '🎉' : correctCount > 0 ? '🌟' : '💪'}
+                </div>
+                <p style={{ fontSize: 20, fontWeight: 900, color: '#0F1115', marginBottom: 6 }}>
+                  {correctCount} / {quizzes.length} 정답
+                </p>
+                <p style={{ fontSize: 30, fontWeight: 900, color: accent, marginBottom: 4 }}>
+                  +{totalXp} XP
+                </p>
+                <p style={{ fontSize: 12, color: '#6B6B66' }}>
+                  {isLive ? '뉴스 기반 퀴즈 보상 획득!' : '정답당 +20 XP 획득!'}
+                </p>
+              </div>
+            )}
             <button onClick={handleComplete} style={{
               width: '100%', padding: 14, borderRadius: 18, border: 'none',
               background: accent, color: '#fff',

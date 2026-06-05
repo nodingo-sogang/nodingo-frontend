@@ -67,18 +67,24 @@ export default function Sidebar({ active, onChange, accentColor, userGame }: Sid
           overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', flexShrink: 0,
         }}>
           <img
-            src={tier.characterImage}
-            alt={tier.name}
+            src={userGame.profileImageUrl || tier.characterImage}
+            alt={userGame.name}
             style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover' }}
             onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = 'none';
-              (e.currentTarget.parentElement as HTMLElement).textContent = '🙂';
+              const img = e.currentTarget as HTMLImageElement;
+              if (!img.dataset.fallback) {
+                img.dataset.fallback = '1';
+                img.src = tier.characterImage;
+              } else {
+                img.style.display = 'none';
+                (img.parentElement as HTMLElement).textContent = '🙂';
+              }
             }}
           />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ fontSize: 13, fontWeight: 900, color: '#0F1115' }}>딩고</span>
+            <span style={{ fontSize: 13, fontWeight: 900, color: '#0F1115' }}>{userGame.name}</span>
             <span style={{ fontSize: 11, fontWeight: 800, color: tier.color }}>· {tier.name}</span>
             <span style={{
               marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 2,

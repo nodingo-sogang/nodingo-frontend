@@ -446,12 +446,16 @@ export default function GraphPage() {
       }
       setUserGame(prev => ({
         ...prev,
+        name: profile?.user_game.nickname ?? prev.name,
+        profileImageUrl: profile?.user_game.profile_image_url ?? prev.profileImageUrl,
         level: profile?.user_game.level ?? prev.level,
         xp: profile?.user_game.xp ?? prev.xp,
         streak: profile?.user_game.streak ?? prev.streak,
         dailyGoal: profile?.daily_goals.quizzes_required ?? prev.dailyGoal,
         dailyProgress: profile?.daily_goals.quizzes_completed ?? prev.dailyProgress,
         totalNodesExplored: progress?.explored_count ?? prev.totalNodesExplored,
+        // 누적 정답 퀴즈 수는 서버가 단일 진실 (로컬 증가분은 동기화 시 서버값으로 교체)
+        totalQuizzesSolved: profile?.user_game.total_quizzes_solved ?? prev.totalQuizzesSolved,
         // 뱃지는 서버가 판정·저장 → 서버 값으로 교체 (재발급 방지)
         badges: serverBadges && serverBadges.length > 0 ? serverBadges.map(toBadge) : prev.badges,
       }));
@@ -590,13 +594,13 @@ export default function GraphPage() {
       setReceiptShownToday(true);
       setReceipt({
         date: new Date().toLocaleDateString('ko-KR'),
-        username: '딩고',
+        username: userGame.name,
         synapseFrom: result.nodeId,
         synapseTo: '지식',
         serial: `NDG-${Date.now().toString().slice(-8)}`,
       });
     }
-  }, [userGame.dailyProgress, userGame.dailyGoal, receiptShownToday, forceMock, syncGameFromServer]);
+  }, [userGame.dailyProgress, userGame.dailyGoal, userGame.name, receiptShownToday, forceMock, syncGameFromServer]);
 
   const tier = tierOf(userGame.level);
 

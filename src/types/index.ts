@@ -67,6 +67,12 @@ export const PERSONA_LABEL: Record<UserPersona, string> = {
   INTERNATIONAL: '국제',
 };
 
+/** 페르소나 enum 코드(POLITICS 등) → 한글 라벨(정치). 이미 한글이거나 미지정 enum이면 원문 유지. */
+export function personaLabel(p?: string | null): string | undefined {
+  if (!p) return undefined;
+  return PERSONA_LABEL[p as UserPersona] ?? p;
+}
+
 export interface PersonaResponse {
   name: UserPersona;
   description: string;
@@ -193,6 +199,8 @@ export interface QuizResponse {
   /** 백엔드 포맷: "yyyy.MM.dd" */
   source_date: string;
   source_url: string;
+  /** 내가 이미 제출(풀이)한 퀴즈인지 — 재제출(400) 방지용 선제 표시 */
+  solved?: boolean;
 }
 
 export interface QuizListResponse {
@@ -225,6 +233,12 @@ export interface UserGameResponse {
   xp_needed: number;
   tier: string;
   streak: number;
+  /** 유저 표시 닉네임 (네이버 프로필 기반) */
+  nickname: string;
+  /** 네이버 프로필 이미지 URL (없을 수 있음) */
+  profile_image_url?: string | null;
+  /** 누적 정답 퀴즈 수 (daily 아님, 전체 통계) */
+  total_quizzes_solved: number;
 }
 
 export interface DailyGoalsResponse {
@@ -252,11 +266,15 @@ export interface RankingEntryResponse {
   rank: number;
   nickname: string;
   level: number;
-  week_xp: number;
+  /** 정식은 snake_case(week_xp). 일부 응답이 camelCase(weekXp)로 와도 수용 */
+  week_xp?: number;
+  weekXp?: number;
+  /** 페르소나 enum 코드 (POLITICS/ECONOMY/...). 표시는 PERSONA_LABEL로 한글 변환 */
   persona?: string;
-  /** 백엔드 boolean 직렬화에 따라 is_me 또는 me 로 올 수 있어 둘 다 수용 */
+  /** 백엔드 boolean 직렬화 흔들림 대응: is_me / me / isMe 모두 수용 */
   is_me?: boolean;
   me?: boolean;
+  isMe?: boolean;
 }
 
 /** GET /api/users/ranking?scope=FRIENDS|PERSONA */
@@ -264,7 +282,9 @@ export interface RankingListResponse {
   scope: string;
   period: string;
   entries: RankingEntryResponse[];
-  my_entry: RankingEntryResponse | null;
+  /** 정식은 snake_case(my_entry). camelCase(myEntry)로 와도 수용 */
+  my_entry?: RankingEntryResponse | null;
+  myEntry?: RankingEntryResponse | null;
 }
 
 // ─── Badges ────────────────────────────────────────────────────────────────────

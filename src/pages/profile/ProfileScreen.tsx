@@ -72,16 +72,22 @@ export default function ProfileScreen({ userGame }: ProfileScreenProps) {
           overflow: 'hidden',
         }}>
           <img
-            src={tier.characterImage}
-            alt={tier.name}
+            src={userGame.profileImageUrl || tier.characterImage}
+            alt={userGame.name}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             onError={e => {
-              (e.currentTarget as HTMLImageElement).style.display = 'none';
-              (e.currentTarget.parentElement as HTMLElement).textContent = '🙂';
+              const img = e.currentTarget as HTMLImageElement;
+              if (!img.dataset.fallback) {
+                img.dataset.fallback = '1';
+                img.src = tier.characterImage;
+              } else {
+                img.style.display = 'none';
+                (img.parentElement as HTMLElement).textContent = '🙂';
+              }
             }}
           />
         </div>
-        <div style={{ fontSize: 20, fontWeight: 900, color: '#0F1115' }}>딩고 님</div>
+        <div style={{ fontSize: 20, fontWeight: 900, color: '#0F1115' }}>{userGame.name} 님</div>
         <div style={{ fontSize: 12, color: '#6B6B66', marginTop: 2 }}>
           {tier.name} · Lv {userGame.level}
         </div>

@@ -36,12 +36,19 @@ export default function HUD({ userGame, onProfileTap }: HUDProps) {
             overflow: 'hidden',
           }}>
             <img
-              src={tier.characterImage}
-              alt={tier.name}
+              src={userGame.profileImageUrl || tier.characterImage}
+              alt={userGame.name}
               style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }}
               onError={(e) => {
-                (e.currentTarget as HTMLImageElement).style.display = 'none';
-                (e.currentTarget.parentElement as HTMLElement).textContent = '🙂';
+                const img = e.currentTarget as HTMLImageElement;
+                // 프로필 이미지 로드 실패 → 티어 캐릭터로 폴백, 그것도 실패하면 이모지
+                if (!img.dataset.fallback) {
+                  img.dataset.fallback = '1';
+                  img.src = tier.characterImage;
+                } else {
+                  img.style.display = 'none';
+                  (img.parentElement as HTMLElement).textContent = '🙂';
+                }
               }}
             />
           </div>
@@ -50,7 +57,7 @@ export default function HUD({ userGame, onProfileTap }: HUDProps) {
             letterSpacing: '-0.01em',
             display: 'flex', alignItems: 'center', gap: 4,
           }}>
-            <span>딩고</span>
+            <span>{userGame.name}</span>
             <span style={{ color: '#6B6B66', fontWeight: 700 }}>· {tier.name}</span>
           </div>
         </button>
