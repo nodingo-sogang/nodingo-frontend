@@ -29,12 +29,12 @@ export default function FriendManageSheet({ accentColor, onClose }: FriendManage
   // 내 친구 목록 / 받은 요청 (실패 시 mock 폴백)
   const { data: friends = [], refetch: refetchFriends } = useQuery<FriendProfile[]>({
     queryKey: ['friends'],
-    queryFn: () => friendApi.getFriends().then(r => r.data.data?.friends ?? []).catch(() => MOCK_FRIENDS),
+    queryFn: () => friendApi.getFriends().catch(() => MOCK_FRIENDS),
     placeholderData: MOCK_FRIENDS,
   });
   const { data: requests = [], refetch: refetchRequests } = useQuery<FriendProfile[]>({
     queryKey: ['friendRequests'],
-    queryFn: () => friendApi.getReceivedRequests().then(r => r.data.data?.friends ?? []).catch(() => MOCK_FRIEND_REQUESTS),
+    queryFn: () => friendApi.getReceivedRequests().catch(() => MOCK_FRIEND_REQUESTS),
     placeholderData: MOCK_FRIEND_REQUESTS,
   });
 
@@ -44,8 +44,8 @@ export default function FriendManageSheet({ accentColor, onClose }: FriendManage
     setSearching(true);
     setSearched(null);
     try {
-      const res = await friendApi.searchByNickname(nickname);
-      setSearched(res.data.data?.user ?? 'none');
+      const user = await friendApi.searchByNickname(nickname);
+      setSearched(user ?? 'none');
     } catch {
       setSearched('none');
     } finally {
@@ -74,8 +74,8 @@ export default function FriendManageSheet({ accentColor, onClose }: FriendManage
     }
   };
 
-  const rowAvatar = (level: number) => {
-    const tier = tierOf(level);
+  const rowAvatar = (friend: FriendProfile) => {
+    const tier = tierOf(friend.level);
     return (
       <div style={{
         width: 38, height: 38, borderRadius: '50%',
@@ -84,9 +84,13 @@ export default function FriendManageSheet({ accentColor, onClose }: FriendManage
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         <img
-          src={tier.characterImage} alt={tier.name}
+          src={friend.profileImageUrl || tier.characterImage} alt={friend.nickname}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+          onError={e => {
+            const img = e.currentTarget as HTMLImageElement;
+            if (!img.dataset.fallback) { img.dataset.fallback = '1'; img.src = tier.characterImage; }
+            else { img.style.display = 'none'; }
+          }}
         />
       </div>
     );
@@ -174,7 +178,7 @@ export default function FriendManageSheet({ accentColor, onClose }: FriendManage
               padding: '10px 12px', borderRadius: 16, marginBottom: 22,
               background: '#E5F4E0', border: '1px solid #BFE3B5',
             }}>
-              {rowAvatar(searched.level)}
+              {rowAvatar(searched)}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 800, color: '#0F1115' }}>{searched.nickname}</div>
                 <div style={{ fontSize: 11, fontWeight: 600, color: tierOf(searched.level).color }}>
@@ -205,7 +209,7 @@ export default function FriendManageSheet({ accentColor, onClose }: FriendManage
                     padding: '10px 12px', borderRadius: 16,
                     background: '#FFFFFF', border: '1px solid #EFEEEA',
                   }}>
-                    {rowAvatar(r.level)}
+                    {rowAvatar(r)}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 800, color: '#0F1115' }}>{r.nickname}</div>
                       <div style={{ fontSize: 11, fontWeight: 600, color: tierOf(r.level).color }}>
@@ -240,7 +244,7 @@ export default function FriendManageSheet({ accentColor, onClose }: FriendManage
                   padding: '10px 12px', borderRadius: 16,
                   background: '#FFFFFF', border: '1px solid #EFEEEA',
                 }}>
-                  {rowAvatar(f.level)}
+                  {rowAvatar(f)}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 800, color: '#0F1115' }}>{f.nickname}</div>
                     <div style={{ fontSize: 11, fontWeight: 600, color: tierOf(f.level).color }}>

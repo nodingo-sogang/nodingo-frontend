@@ -6,6 +6,7 @@ import {
   forceCenter, forceCollide, forceX, forceY,
 } from 'd3-force';
 import { graphApi } from '../../api/graph';
+import { quizApi } from '../../api/quiz';
 import { FogLayer, UnlockAnimation } from '../../components/game/FogOverlay';
 import type { GraphNodeResponse, NodeSummaryResponse, NewsItemBrief, UserPersona } from '../../types';
 import { PERSONA_LABEL } from '../../types';
@@ -171,6 +172,8 @@ export default function GraphScreen({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [scrappedNodes, setScrappedNodes] = useState<Map<number, ScrappedNode>>(new Map());
   const exploredRef = useRef<Set<number>>(new Set());
+  // exploredRef(ref) 시드 시 리렌더를 보장하기 위한 버전 (ref만 바꾸면 렌더가 안 일어남)
+  const [, setExploreSeedVersion] = useState(0);
 
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const transformRef = useRef(transform);
@@ -260,6 +263,28 @@ export default function GraphScreen({
     });
     return { allNodes: [...nodeMap.values()], allEdges: edges, tabNodeIds };
   }, [displayTabs, graphQueries]);
+
+  // 서버가 준 explored/scrapped 플래그로 표시 상태를 시드 → 재로그인/새로고침에도 탐험(주황)·스크랩(♥) 유지.
+  // (세션 메모리만 쓰면 돌아온 유저의 기존 기록이 미표시되던 갭 보완)
+  useEffect(() => {
+    if (forceMock || allNodes.length === 0) return;
+    let exploredChanged = false;
+    allNodes.forEach(n => {
+      if (n.explored && !exploredRef.current.has(n.id)) { exploredRef.current.add(n.id); exploredChanged = true; }
+    });
+    if (exploredChanged) setExploreSeedVersion(v => v + 1);
+    setScrappedNodes(prev => {
+      let changed = false;
+      const next = new Map(prev);
+      allNodes.forEach(n => {
+        if (n.scrapped && !next.has(n.id)) {
+          next.set(n.id, { id: n.id, label: n.label, persona: n.persona, summary: n.summary ?? '' });
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [allNodes, forceMock]);
 
   const { displayNodes, displayEdges, dynamicUnlockLevels } = useMemo(() => {
     const degree = new Map<number, number>();
@@ -368,6 +393,21 @@ export default function GraphScreen({
     }
     return list;
   }, [summaryPages]);
+
+  // 퀴즈 가용성 (관련 뉴스 3개 이하면 백엔드가 퀴즈를 생성 못 할 수 있음 → 버튼 선제 표시)
+  // null = 미확인/에러(가용으로 간주해 차단하지 않음), {count, solvedCount} = 확정.
+  const { data: quizMeta, isLoading: quizMetaLoading } = useQuery({
+    queryKey: ['quizMeta', selectedNodeId],
+    queryFn: () =>
+      quizApi.getQuizzes(selectedNodeId as number)
+        .then(r => {
+          const list = r.data.data?.quizzes ?? [];
+          return { count: list.length, solvedCount: list.filter(q => q.solved).length };
+        })
+        .catch(() => null),
+    enabled: !forceMock && sheetOpen && selectedNodeId !== null,
+    staleTime: 60_000,
+  });
 
   // ── Scrap mutation ────────────────────────────────────────────────────────────
 
@@ -646,6 +686,21 @@ export default function GraphScreen({
   const quizCompleted = nodeSummary
     ? userGame.completedQuizzes.includes(nodeSummary.word)
     : false;
+  // 퀴즈 CTA 상태 (live 권위 데이터 기반). quizMeta: undefined=로딩/비활성, null=에러(차단X), object=확정.
+  const quizUnavailable = quizMeta != null && quizMeta.count === 0;
+  const quizAllSolved = quizMeta != null && quizMeta.count > 0 && quizMeta.solvedCount >= quizMeta.count;
+  const quizChecking = !forceMock && sheetOpen && selectedNodeId !== null && quizMetaLoading;
+  const quizDone = quizCompleted || quizAllSolved;     // 완료(초록) 표시
+  const quizBlocked = quizDone || quizChecking || quizUnavailable; // 클릭 차단
+  const quizLabel = quizCompleted
+    ? '✓ 오늘 완료 · +60 XP 받음'
+    : quizChecking
+      ? '퀴즈 확인 중…'
+      : quizUnavailable
+        ? '🔒 관련 뉴스가 부족해 퀴즈가 아직 없어요'
+        : quizAllSolved
+          ? '✓ 이 노드 퀴즈 완료'
+          : '🎯 뉴스 기반 퀴즈 풀기  +60 XP';
   // 서버가 준 실제 뉴스(전 페이지 누적)가 있으면 그걸 쓰고, 없으면 합성 fallback
   // 라이브에선 실제 뉴스만 노출. 없으면(이웃 노드 인라인 폴백 등) 합성 가짜 뉴스(example.com) 대신 빈 상태.
   // 합성 뉴스는 mock/preview 데모용으로만 사용.
@@ -1252,21 +1307,31 @@ export default function GraphScreen({
                 <div style={{ padding: '10px 18px 16px', borderTop: '1px solid #EFEEEA' }}>
                   <button
                     onClick={() => {
-                      if (quizCompleted) return;
+                      if (quizBlocked) return;
                       setSheetOpen(false);
                       onQuizStart(nodeSummary.keyword_id, nodeSummary.word);
                     }}
+                    disabled={quizBlocked}
                     style={{
                       width: '100%', padding: '13px 0', borderRadius: 18,
-                      background: quizCompleted ? '#E8F4EA' : tier.color,
-                      color: quizCompleted ? '#1E8460' : '#fff',
-                      border: 'none', cursor: quizCompleted ? 'default' : 'pointer',
+                      // 완료=초록 / 없음·확인중=중립회색 / 가능=티어색
+                      background: quizDone ? '#E8F4EA' : quizBlocked ? '#F4F4F0' : tier.color,
+                      color: quizDone ? '#1E8460' : quizBlocked ? '#9A9A94' : '#fff',
+                      border: 'none', cursor: quizBlocked ? 'default' : 'pointer',
                       fontSize: 14, fontWeight: 800,
-                      boxShadow: quizCompleted ? 'none' : `0 4px 0 ${darken(tier.color)}`,
+                      boxShadow: quizBlocked ? 'none' : `0 4px 0 ${darken(tier.color)}`,
                     }}
                   >
-                    {quizCompleted ? '✓ 오늘 완료 · +60 XP 받음' : '🎯 뉴스 기반 퀴즈 풀기  +60 XP'}
+                    {quizLabel}
                   </button>
+                  {quizUnavailable && (
+                    <div style={{
+                      marginTop: 8, fontSize: 11.5, color: '#9A9A94',
+                      textAlign: 'center', lineHeight: 1.5, fontWeight: 600,
+                    }}>
+                      관련 뉴스가 더 모이면 이 노드의 퀴즈가 생성돼요.
+                    </div>
+                  )}
                 </div>
               </>
             ) : (

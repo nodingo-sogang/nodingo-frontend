@@ -3,19 +3,20 @@ import { useQuery } from '@tanstack/react-query';
 import { MOCK_RANKING_FRIENDS, MOCK_RANKING_PERSONA, tierOf, xpForLevel } from '../../mocks';
 import FriendManageSheet from '../../components/social/FriendManageSheet';
 import { rankingApi } from '../../api/ranking';
+import { personaLabel } from '../../types';
 import type { RankingEntryResponse, RankingListResponse } from '../../types';
 import type { RankingEntry, UserGame } from '../../types/game';
 
-// 서버 응답(snake_case) → 화면용 RankingEntry 매핑
+// 서버 응답 → 화면용 RankingEntry 매핑 (snake/camel 직렬화 흔들림 모두 수용)
 function toEntry(e: RankingEntryResponse): RankingEntry {
   return {
     rank: e.rank,
     name: e.nickname,
     avatar: '',
     level: e.level,
-    weekXp: e.week_xp,
-    persona: e.persona,
-    isMe: e.is_me ?? e.me ?? false,
+    weekXp: e.week_xp ?? e.weekXp ?? 0,
+    persona: personaLabel(e.persona),
+    isMe: e.is_me ?? e.me ?? e.isMe ?? false,
   };
 }
 
@@ -23,7 +24,8 @@ type MappedRanking = { entries: RankingEntry[]; myEntry: RankingEntry | null };
 
 function mapRanking(data: RankingListResponse | null): MappedRanking {
   const entries = (data?.entries ?? []).map(toEntry);
-  const myEntry = data?.my_entry ? toEntry(data.my_entry) : null;
+  const myRaw = data?.my_entry ?? data?.myEntry ?? null;
+  const myEntry = myRaw ? toEntry(myRaw) : null;
   return { entries, myEntry };
 }
 

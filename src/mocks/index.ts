@@ -581,6 +581,7 @@ export const ALL_BADGES: Badge[] = [
 ];
 
 export const MOCK_USER_GAME: UserGame = {
+  name: '딩고',
   level: 1, xp: 82,
   streak: 1, dailyGoal: 2, dailyProgress: 0,
   scrapped: [],
