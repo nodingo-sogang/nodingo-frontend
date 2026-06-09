@@ -3,13 +3,14 @@ import { personaLabel } from '../types';
 import type { ApiResponse } from '../types';
 import type { FriendProfile } from '../types/game';
 
-// 백엔드 친구 프로필 raw — 직렬화 흔들림(userId vs user_id) + snake 프로필 이미지 + persona enum
+// 백엔드 친구 프로필 raw — 백엔드는 camelCase(userId/profileImageUrl). snake도 폴백 수용.
 interface FriendProfileRaw {
   userId?: number;
   user_id?: number;
   nickname: string;
   level: number;
   persona?: string;
+  profileImageUrl?: string | null;
   profile_image_url?: string | null;
 }
 
@@ -20,7 +21,7 @@ function toFriend(r: FriendProfileRaw): FriendProfile {
     nickname: r.nickname,
     level: r.level,
     persona: personaLabel(r.persona),
-    profileImageUrl: r.profile_image_url ?? null,
+    profileImageUrl: r.profileImageUrl ?? r.profile_image_url ?? null,
   };
 }
 
@@ -34,9 +35,9 @@ export const friendApi = {
       })
       .then((r) => (r.data.data?.user ? toFriend(r.data.data.user) : null)),
 
-  // 친구 요청 보내기 (body 키는 camelCase targetUserId — 스펙 준수)
+  // 친구 요청 보내기 (백엔드 wire=snake_case → target_user_id. OpenAPI의 camel은 springdoc 표기일 뿐)
   sendRequest: (targetUserId: number) =>
-    apiClient.post<ApiResponse<void>>('/api/friends/request', { targetUserId }),
+    apiClient.post<ApiResponse<void>>('/api/friends/request', { target_user_id: targetUserId }),
 
   // 받은 친구 요청 목록 (PENDING)
   getReceivedRequests: () =>
@@ -44,9 +45,9 @@ export const friendApi = {
       .get<ApiResponse<{ friends: FriendProfileRaw[] }>>('/api/friends/received')
       .then((r) => (r.data.data?.friends ?? []).map(toFriend)),
 
-  // 친구 요청 수락
+  // 친구 요청 수락 (body=snake_case)
   acceptRequest: (targetUserId: number) =>
-    apiClient.post<ApiResponse<void>>('/api/friends/accept', { targetUserId }),
+    apiClient.post<ApiResponse<void>>('/api/friends/accept', { target_user_id: targetUserId }),
 
   // 내 친구 목록 (ACCEPTED)
   getFriends: () =>

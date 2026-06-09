@@ -53,13 +53,22 @@ export default function FriendManageSheet({ accentColor, onClose }: FriendManage
     }
   };
 
+  // axios 에러에서 백엔드 실제 메시지/상태를 추출 (catch에서 가짜 안내 대신 진짜 원인 노출)
+  const errMessage = (err: unknown, fallback: string) => {
+    const res = (err as { response?: { data?: { message?: string }; status?: number } })?.response;
+    return res?.data?.message || `${fallback} (${res?.status ?? '네트워크 오류'})`;
+  };
+
   const handleRequest = async (target: FriendProfile) => {
+    if (!target.user_id) { showToast('상대 정보를 찾을 수 없어요 (user_id 누락)'); return; }
     setRequestedIds(prev => new Set(prev).add(target.user_id));
     try {
       await friendApi.sendRequest(target.user_id);
       showToast(`${target.nickname}님에게 친구 요청을 보냈어요 🤝`);
-    } catch {
-      showToast('친구 요청에 실패했어요 (로그인 필요)');
+    } catch (err) {
+      // 실패 시 optimistic '요청됨' 롤백 + 백엔드 실제 메시지 노출
+      setRequestedIds(prev => { const n = new Set(prev); n.delete(target.user_id); return n; });
+      showToast(errMessage(err, '친구 요청 실패'));
     }
   };
 
@@ -69,8 +78,8 @@ export default function FriendManageSheet({ accentColor, onClose }: FriendManage
       showToast(`${requester.nickname}님과 친구가 됐어요! 🎉`);
       void refetchRequests();
       void refetchFriends();
-    } catch {
-      showToast('수락에 실패했어요 (로그인 필요)');
+    } catch (err) {
+      showToast(errMessage(err, '수락 실패'));
     }
   };
 
