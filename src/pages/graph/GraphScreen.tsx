@@ -174,6 +174,8 @@ export default function GraphScreen({
   const exploredRef = useRef<Set<number>>(new Set());
   // exploredRef(ref) 시드 시 리렌더를 보장하기 위한 버전 (ref만 바꾸면 렌더가 안 일어남)
   const [, setExploreSeedVersion] = useState(0);
+  // scrapped 시드를 노드별 1회로 제한 (서버 플래그 재시드가 사용자 해제를 되돌리지 않게)
+  const seededScrapRef = useRef<Set<number>>(new Set());
 
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const transformRef = useRef(transform);
@@ -273,16 +275,18 @@ export default function GraphScreen({
       if (n.explored && !exploredRef.current.has(n.id)) { exploredRef.current.add(n.id); exploredChanged = true; }
     });
     if (exploredChanged) setExploreSeedVersion(v => v + 1);
+    // scrapped 시드 — 노드별 최초 1회만. 이후엔 사용자 토글이 우선(재시드로 해제가 되돌려지지 않음).
+    const toSeed = allNodes.filter(n => !seededScrapRef.current.has(n.id));
+    if (toSeed.length === 0) return;
+    toSeed.forEach(n => seededScrapRef.current.add(n.id));
+    const add = toSeed.filter(n => n.scrapped);
+    if (add.length === 0) return;
     setScrappedNodes(prev => {
-      let changed = false;
       const next = new Map(prev);
-      allNodes.forEach(n => {
-        if (n.scrapped && !next.has(n.id)) {
-          next.set(n.id, { id: n.id, label: n.label, persona: n.persona, summary: n.summary ?? '' });
-          changed = true;
-        }
+      add.forEach(n => {
+        if (!next.has(n.id)) next.set(n.id, { id: n.id, label: n.label, persona: n.persona, summary: n.summary ?? '' });
       });
-      return changed ? next : prev;
+      return next;
     });
   }, [allNodes, forceMock]);
 
