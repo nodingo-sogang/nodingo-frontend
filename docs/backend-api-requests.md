@@ -53,6 +53,26 @@ if (recommendKeywordRepository.existsByUserIdAndTargetDate(user.getId(), today))
 - 요청: `saveOnboardingInfo`가 오늘 관심사를 지우고 다시 넣듯, **재온보딩 시 오늘 RecommendKeyword도 삭제 후 재생성**(또는 테스트용 리셋 엔드포인트)
 - → 한 계정으로 페르소나 바꿔가며 추천 변화를 테스트할 수 있게 됨
 
+### A-4. 🔴 일부 그래프 노드 스크랩 시 `POST /api/keywords/{id}/scrap` → 404 (키워드 없음)
+
+**증상:** 그래프에서 어떤 노드는 스크랩이 되는데(예: id 834 "화제성" → `201 Created`), **어떤 노드는 `404 Not Found`** 가 납니다 (예: id 1232 "한·미 금리차 역전").
+- 화면엔 ♥가 켜지지만 서버엔 저장 안 됨 → 새로고침하면 사라지고, 보관함도 비어 보임.
+- (프론트는 실패 시 ♥를 롤백하도록 보강했지만, **근본 원인은 그 노드를 스크랩할 수 없는 것**)
+
+**원인 추정:** `GET /api/graphs/nodes`가 반환하는 **노드 id**가, `POST /api/keywords/{keywordId}/scrap`가 기대하는 **스크랩 가능한 Keyword 레코드 id와 불일치**. 즉 그래프엔 보이는데 **스크랩 대상 키워드로는 존재하지 않는 노드**가 있습니다. (이웃/파생 노드가 Keyword 엔티티로 저장돼 있지 않거나, id 체계가 다를 가능성)
+
+```text
+요청:  POST /api/keywords/1232/scrap
+응답:  404 Not Found  { "success": false, "code": 404, "message": "...키워드를 찾을 수 없습니다." }
+정상:  POST /api/keywords/834/scrap  → 201 Created
+```
+
+**요청 사항**
+- **그래프가 내려주는 모든 노드 id가 `POST /api/keywords/{id}/scrap` 로 스크랩 가능**하도록 정합성 보장
+  - 그래프 노드 ↔ 스크랩 키워드의 **id 체계 일치** 확인
+  - 또는 스크랩 시 노드 id로 **키워드를 찾지 못하면 생성/매핑**하거나, 그래프 응답에 **scrap 가능 여부/스크랩용 keywordId**를 따로 내려주기
+- ✅ 프론트는 노드 id를 그대로 전송 중 — 백엔드에서 그 id를 스크랩 키워드로 해석할 수 있으면 즉시 해결
+
 ---
 
 ## 🚀 D. 배포(Vercel) 연동 — 로그인 살리기
