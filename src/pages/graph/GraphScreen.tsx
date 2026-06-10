@@ -440,34 +440,32 @@ export default function GraphScreen({
 
   // ── Scrap mutation ────────────────────────────────────────────────────────────
 
+  // 의도(shouldScrap)를 클릭 시점에 정해 명시 전달 → 요청 방향이 항상 표시된 ♥와 일치
+  // (mutationFn이 scrappedNodes 클로저로 재계산하면 잦은 리렌더 타이밍에 반대로 갈 수 있어 제거)
   const scrapMutation = useMutation({
-    mutationFn: (node: ScrappedNode) => {
+    mutationFn: ({ node, shouldScrap }: { node: ScrappedNode; shouldScrap: boolean }) => {
       if (forceMock) return Promise.resolve(null);
-      return scrappedNodes.has(node.id)
-        ? graphApi.unscrapKeyword(node.id)
-        : graphApi.scrapKeyword(node.id);
+      return shouldScrap ? graphApi.scrapKeyword(node.id) : graphApi.unscrapKeyword(node.id);
     },
-    onMutate: (node) => {
-      const wasScraped = scrappedNodes.has(node.id);
+    onMutate: ({ node, shouldScrap }) => {
       setScrappedNodes(prev => {
         const next = new Map(prev);
-        if (wasScraped) {
-          next.delete(node.id);
-          onScrapChange?.(node, false);
-        }
-        else {
+        if (shouldScrap) {
           next.set(node.id, node);
           onScrapChange?.(node, true);
           onScrap(node.id, node.label);
+        } else {
+          next.delete(node.id);
+          onScrapChange?.(node, false);
         }
         return next;
       });
       // 그래프 캐시 + 권위 스크랩 목록 둘 다 패치 → 탭 전환/리마운트/시드가 올바른 값을 읽음
-      patchNodeScrapped(node.id, !wasScraped);
+      patchNodeScrapped(node.id, shouldScrap);
       queryClient.setQueryData<{ id: number; word: string; persona: string }[]>(['scrapNodeIds'], (old) => {
         const list = old ?? [];
-        if (wasScraped) return list.filter(s => s.id !== node.id);
-        return list.some(s => s.id === node.id) ? list : [...list, { id: node.id, word: node.label, persona: node.persona }];
+        if (shouldScrap) return list.some(s => s.id === node.id) ? list : [...list, { id: node.id, word: node.label, persona: node.persona }];
+        return list.filter(s => s.id !== node.id);
       });
     },
     // 스크랩/해제 커밋 후 서버 게임 상태(스크랩 XP 등) 재동기화
@@ -1166,10 +1164,14 @@ export default function GraphScreen({
                   </div>
                   <button
                     onClick={() => scrapMutation.mutate({
-                      id: selectedNodeId!,
-                      label: nodeSummary.word,
-                      persona: nodeSummary.persona,
-                      summary: nodeSummary.summary,
+                      node: {
+                        id: selectedNodeId!,
+                        label: nodeSummary.word,
+                        persona: nodeSummary.persona,
+                        summary: nodeSummary.summary,
+                      },
+                      // 표시된 ♥ 기준으로 의도 결정 (켜져있으면 해제, 꺼져있으면 추가)
+                      shouldScrap: !scrappedNodes.has(selectedNodeId!),
                     })}
                     style={{
                       width: 38, height: 38, borderRadius: '50%',
