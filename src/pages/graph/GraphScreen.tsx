@@ -7,6 +7,7 @@ import {
 } from 'd3-force';
 import { graphApi } from '../../api/graph';
 import { quizApi } from '../../api/quiz';
+import { scrapApi } from '../../api/scrap';
 import { FogLayer, UnlockAnimation } from '../../components/game/FogOverlay';
 import type { GraphNodeResponse, GraphDataResponse, NodeSummaryResponse, NewsItemBrief, UserPersona } from '../../types';
 import { PERSONA_LABEL } from '../../types';
@@ -274,8 +275,20 @@ export default function GraphScreen({
     return { allNodes: [...nodeMap.values()], allEdges: edges, tabNodeIds };
   }, [displayTabs, graphQueries]);
 
-  // 서버가 준 explored/scrapped 플래그로 표시 상태를 시드 → 재로그인/새로고침에도 탐험(주황)·스크랩(♥) 유지.
-  // (세션 메모리만 쓰면 돌아온 유저의 기존 기록이 미표시되던 갭 보완)
+  // 내 실제 스크랩 목록(서버 권위). 그래프 node.scrapped는 백엔드 @Cacheable로 stale일 수 있어,
+  // 새로고침·기기 간 ♥ 유지를 위해 캐시 안 되는 이 목록을 단일 진실로 사용.
+  const { data: scrapList } = useQuery({
+    queryKey: ['scrapNodeIds'],
+    queryFn: () => scrapApi.getScrapNodes().then(r => r.data.data?.content ?? []).catch(() => []),
+    enabled: !forceMock,
+    staleTime: 30_000,
+  });
+  const scrappedIdSet = useMemo(
+    () => new Set((scrapList ?? []).map(s => s.id)),
+    [scrapList],
+  );
+
+  // 서버 explored 플래그 + 스크랩 목록으로 표시 상태를 시드 → 새로고침/기기 간 탐험(주황)·스크랩(♥) 유지.
   useEffect(() => {
     if (forceMock || allNodes.length === 0) return;
     let exploredChanged = false;
@@ -290,14 +303,15 @@ export default function GraphScreen({
       let changed = false;
       const next = new Map(prev);
       allNodes.forEach(n => {
-        if (n.scrapped && !next.has(n.id)) {
+        // 스크랩 목록(권위) 우선, 그래프 플래그는 보조
+        if ((scrappedIdSet.has(n.id) || n.scrapped) && !next.has(n.id)) {
           next.set(n.id, { id: n.id, label: n.label, persona: n.persona, summary: n.summary ?? '' });
           changed = true;
         }
       });
       return changed ? next : prev;
     });
-  }, [allNodes, forceMock]);
+  }, [allNodes, forceMock, scrappedIdSet]);
 
   const { displayNodes, displayEdges, dynamicUnlockLevels } = useMemo(() => {
     const degree = new Map<number, number>();
@@ -446,8 +460,13 @@ export default function GraphScreen({
         }
         return next;
       });
-      // 캐시도 같이 패치 → 탭 전환/리마운트 후에도 시드가 올바른 값을 읽음
+      // 그래프 캐시 + 권위 스크랩 목록 둘 다 패치 → 탭 전환/리마운트/시드가 올바른 값을 읽음
       patchNodeScrapped(node.id, !wasScraped);
+      queryClient.setQueryData<{ id: number; word: string; persona: string }[]>(['scrapNodeIds'], (old) => {
+        const list = old ?? [];
+        if (wasScraped) return list.filter(s => s.id !== node.id);
+        return list.some(s => s.id === node.id) ? list : [...list, { id: node.id, word: node.label, persona: node.persona }];
+      });
     },
     // 스크랩/해제 커밋 후 서버 게임 상태(스크랩 XP 등) 재동기화
     onSettled: () => onGameSync?.(),
