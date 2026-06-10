@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import type { CSSProperties } from 'react';
-import { useQuery, useQueries, useMutation, useInfiniteQuery } from '@tanstack/react-query';
+import { useQuery, useQueries, useMutation, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import {
   forceSimulation, forceLink, forceManyBody,
   forceCenter, forceCollide, forceX, forceY,
@@ -8,7 +8,7 @@ import {
 import { graphApi } from '../../api/graph';
 import { quizApi } from '../../api/quiz';
 import { FogLayer, UnlockAnimation } from '../../components/game/FogOverlay';
-import type { GraphNodeResponse, NodeSummaryResponse, NewsItemBrief, UserPersona } from '../../types';
+import type { GraphNodeResponse, GraphDataResponse, NodeSummaryResponse, NewsItemBrief, UserPersona } from '../../types';
 import { PERSONA_LABEL } from '../../types';
 import type { UserGame } from '../../types/game';
 import { MOCK_TABS, MOCK_GRAPH, MOCK_SUMMARIES, NODE_UNLOCK_LEVELS, tierOf } from '../../mocks';
@@ -174,8 +174,16 @@ export default function GraphScreen({
   const exploredRef = useRef<Set<number>>(new Set());
   // exploredRef(ref) 시드 시 리렌더를 보장하기 위한 버전 (ref만 바꾸면 렌더가 안 일어남)
   const [, setExploreSeedVersion] = useState(0);
-  // scrapped 시드를 노드별 1회로 제한 (서버 플래그 재시드가 사용자 해제를 되돌리지 않게)
-  const seededScrapRef = useRef<Set<number>>(new Set());
+  const queryClient = useQueryClient();
+
+  // 그래프 캐시(['graph', *])의 해당 노드 scrapped 플래그를 패치 → 캐시를 스크랩의 단일 진실로.
+  // (탭 전환 후 리마운트 시 시드가 올바른 값을 읽어 ♥ 유지)
+  const patchNodeScrapped = useCallback((nodeId: number, scrapped: boolean) => {
+    queryClient.setQueriesData<GraphDataResponse>({ queryKey: ['graph'] }, (old) => {
+      if (!old || !old.nodes.some(n => n.id === nodeId)) return old;
+      return { ...old, nodes: old.nodes.map(n => (n.id === nodeId ? { ...n, scrapped } : n)) };
+    });
+  }, [queryClient]);
 
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const transformRef = useRef(transform);
@@ -275,18 +283,19 @@ export default function GraphScreen({
       if (n.explored && !exploredRef.current.has(n.id)) { exploredRef.current.add(n.id); exploredChanged = true; }
     });
     if (exploredChanged) setExploreSeedVersion(v => v + 1);
-    // scrapped 시드 — 노드별 최초 1회만. 이후엔 사용자 토글이 우선(재시드로 해제가 되돌려지지 않음).
-    const toSeed = allNodes.filter(n => !seededScrapRef.current.has(n.id));
-    if (toSeed.length === 0) return;
-    toSeed.forEach(n => seededScrapRef.current.add(n.id));
-    const add = toSeed.filter(n => n.scrapped);
-    if (add.length === 0) return;
+    // scrapped 시드 — 캐시(node.scrapped)를 단일 진실로 반영. scrapped=true인데 맵에 없으면 추가.
+    // 해제는 onMutate가 맵 제거 + 캐시 패치(scrapped=false)하므로 여기서 되돌려지지 않음.
+    // 변화 없으면 동일 참조(prev) 반환 → 매 렌더 재시드 churn/루프 방지.
     setScrappedNodes(prev => {
+      let changed = false;
       const next = new Map(prev);
-      add.forEach(n => {
-        if (!next.has(n.id)) next.set(n.id, { id: n.id, label: n.label, persona: n.persona, summary: n.summary ?? '' });
+      allNodes.forEach(n => {
+        if (n.scrapped && !next.has(n.id)) {
+          next.set(n.id, { id: n.id, label: n.label, persona: n.persona, summary: n.summary ?? '' });
+          changed = true;
+        }
       });
-      return next;
+      return changed ? next : prev;
     });
   }, [allNodes, forceMock]);
 
@@ -423,9 +432,9 @@ export default function GraphScreen({
         : graphApi.scrapKeyword(node.id);
     },
     onMutate: (node) => {
+      const wasScraped = scrappedNodes.has(node.id);
       setScrappedNodes(prev => {
         const next = new Map(prev);
-        const wasScraped = next.has(node.id);
         if (wasScraped) {
           next.delete(node.id);
           onScrapChange?.(node, false);
@@ -437,6 +446,8 @@ export default function GraphScreen({
         }
         return next;
       });
+      // 캐시도 같이 패치 → 탭 전환/리마운트 후에도 시드가 올바른 값을 읽음
+      patchNodeScrapped(node.id, !wasScraped);
     },
     // 스크랩/해제 커밋 후 서버 게임 상태(스크랩 XP 등) 재동기화
     onSettled: () => onGameSync?.(),
