@@ -12,13 +12,13 @@
 ### 🔴 지금 막혀 있는 것 (우선)
 | 항목 | 증상 | 상태 |
 |---|---|---|
-| [A-5 ①](#a-5-미해결--남은-스크랩-버그-3건) `isKeywordScrapped` 잘못된 컬럼 | **이미 스크랩한 키워드 재스크랩 시 500** | 🔴 미해결 |
-| [A-5 ②](#a-5-미해결--남은-스크랩-버그-3건) `getScrapKeywordGraph` NPE | **스크랩 그래프 엣지가 안 뜸** | 🟡 백엔드 수정 적용 중 |
-| [A-5 ③](#a-5-미해결--남은-스크랩-버그-3건) `deleteByUserId` 복붙 버그 | **회원탈퇴가 깨질 수 있음** | 🔴 미해결 |
+| [A-5 ②](#a-5-남은-스크랩-버그--커밋-907edf4-기준) `getScrapKeywordGraph` NPE | **스크랩 그래프 엣지가 안 뜸** | 🔴 미해결 (마지막 1건) |
 
 ### ✅ 해결된 것
 | 항목 | 내용 | 상태 |
 |---|---|---|
+| [A-5 ①](#a-5-남은-스크랩-버그--커밋-907edf4-기준) 재스크랩 500 | `isKeywordScrapped` → `keyword.id` 비교 | ✅ 커밋 `907edf4` |
+| [A-5 ③](#a-5-남은-스크랩-버그--커밋-907edf4-기준) 회원탈퇴 FK 위반 | `deleteByUserId` → `delete from UserScrap` | ✅ 커밋 `907edf4` |
 | [A-4](#a-4-해결됨-일반-키워드-스크랩-저장조회-커밋-1896b24) 일반 키워드 스크랩 저장/조회 | `nodes`·`summaries`가 일반 스크랩 누락/NPE | ✅ 커밋 `1896b24` |
 | [5번](#5--스크랩-그래프-엣지-포함--배포됨) 스크랩 그래프 엔드포인트 | `/api/users/scraps/keywords/graph` 생성 | ✅ 배포됨(단, 엣지는 A-5②로 막힘) |
 | [D-1](#d-1--oauth-성공-후-리다이렉트-주소-변경-유일한-필수-변경) OAuth 리다이렉트 | 배포본 로그인 | ✅ (배포 로그인 정상) |
@@ -94,11 +94,14 @@ if (recommendKeywordRepository.existsByUserIdAndTargetDate(user.getId(), today))
 
 ---
 
-### A-5. 🔴 [미해결] 남은 스크랩 버그 3건
+### A-5. 남은 스크랩 버그 (커밋 `907edf4` 기준)
 
-A-4 수정(커밋 `1896b24`) **이후 재테스트**. `nodes`/`summaries`는 고쳐졌으나 아래 3건이 남아 있습니다. **전부 백엔드, 프론트 수정 불필요.**
+A-4 수정 이후 발견된 3건 중 **①③은 커밋 `907edf4`에서 해결**, **②만 미해결**. 전부 백엔드, 프론트 수정 불필요.
 
-#### ① 🔴 이미 스크랩된 키워드 재스크랩 시 500 (중복체크가 잘못된 컬럼 비교)
+#### ① ✅ [해결됨 · `907edf4`] 이미 스크랩된 키워드 재스크랩 시 500 (중복체크가 잘못된 컬럼 비교)
+> **수정 확인:** `isKeywordScrapped`가 `userScrap.keyword.id.eq(keywordId)`로 변경됨 → 중복 정상 검출 → 재스크랩 시 500 대신 409. (`findByUserIdAndKeywordId`도 QueryDSL `keyword.id` 기준으로 정리됨)
+
+<details><summary>당시 원인/패치 (참고용)</summary>
 - **증상:** 이미 스크랩된 키워드(예: 834)를 다시 `POST /api/keywords/834/scrap` → **500 Internal Server Error**.
 - **원인:** `addScrap`이 `isKeywordScrapped(userId, keywordId)`로 중복 검사하는데, 내부 쿼리가 `keyword.id`가 아니라 **`recommendKeyword.id`를 비교**(`UserScrapRepositoryImpl` L27). recommendKeyword PK는 keywordId와 안 맞아 **중복을 못 거름** → `save()` 진행 → `user_scraps`의 유니크 제약 `(user_id, keyword_id)` 위반 → `DataIntegrityViolationException` → 전용 핸들러 없어 generic 500.
   - 참고: `DuplicateScrapException`은 409로 매핑돼 있음(`GlobalExceptionHandler` L100-102). 중복만 제대로 검출됐으면 깔끔한 409였을 것.
@@ -109,11 +112,13 @@ userScrap.recommendKeyword.id.eq(recommendKeywordId)
 // TO-BE — 실제 스크랩 키 비교
 userScrap.keyword.id.eq(keywordId)
 ```
-- `findKeywordScrap`(L35-44, removeScrap가 사용)도 동일하게 `recommendKeyword.id`를 봐서 같이 `keyword.id`로 교정 권장.
+- `findKeywordScrap`(L35-44)도 `recommendKeyword.id` 기준이나, removeScrap는 새 `findByUserIdAndKeywordId`(`keyword.id`)를 쓰므로 영향 없음.
 
-#### ② 🟡 스크랩 그래프 엣지가 안 뜸 (graph 엔드포인트 NPE → 500) — **백엔드 수정 적용 중**
-> **상태(2026-06-10): 최성민님 수정 적용 중.** 일반 키워드는 추천 점수(`recommendKeyword.score`)가 없어 `double score = (rk != null) ? rk.getScore() : 0.0;`로 폴백 처리. (4월 설계 대비 DB가 많이 바뀌어 스키마 전면 수정은 보류, 현재로선 이 방식이 최선) → 배포되면 엣지 정상 표시.
-> **프론트는 그대로 OK** — `ScrapGraphView`는 `score`를 안 쓰므로 `score=0`이 와도 무해. 추가 작업 없음.
+</details>
+
+#### ② 🔴 [미해결 — 마지막 1건] 스크랩 그래프 엣지가 안 뜸 (graph 엔드포인트 NPE → 500)
+> **상태: 아직 미반영.** 커밋 `907edf4`는 repository 3개 파일만 고쳤고 `RecommendKeywordScrapQueryService`는 안 건드림 → 현재 코드 L67·L78이 그대로 `s.getRecommendKeyword().getKeyword()` / `rk.getScore()`. 일반 스크랩이 하나라도 있으면 **NPE → 500 → 엣지 안 뜸.**
+> **프론트는 그대로 OK** — `ScrapGraphView`는 `score`를 안 쓰므로 `score=0`이 와도 무해. 백엔드가 500만 안 던지면 즉시 엣지 표시.
 
 - **증상:** 보관함 그래프 뷰에 노드만 뜨고 **엣지(관계선)가 안 보임**.
 - **원인:** `getScrapKeywordGraph`(`RecommendKeywordScrapQueryService` L66-80)가 `s.getRecommendKeyword().getKeyword()`를 호출 → 일반 스크랩(recommendKeyword=null)이 하나라도 있으면 **NPE → 500** → 프론트가 catch해서 노드-only로 폴백 → 엣지 없음. (A-4 ③과 동일 버그인데 직전 커밋에서 summaries만 고치고 graph는 빠뜨림.)
@@ -131,16 +136,22 @@ new NodeResult(k.getId(), k.getWord(), k.getPersona().name(), score);
 - ✅ 프론트는 엣지 렌더(`ScrapGraphView` `<line>`)까지 준비 완료 — 백엔드가 500만 안 던지면 즉시 엣지 표시.
 - 참고: 고친 뒤에도 엣지는 **스크랩한 키워드 2개가 서로 직접 `keyword_relation`이 있을 때만** 그려짐(`findAllRelationsIn`은 양 끝점이 모두 스크랩 집합일 때만 반환). 스크랩이 적거나 서로 관계 없으면 0개가 정상.
 
-#### ③ 🔴 회원탈퇴가 스크랩을 안 지움 → 탈퇴 FK 위반으로 실패 가능 (복붙 버그)
-- **증상:** 스크랩이 있는 계정 탈퇴 시 외래키 제약 위반으로 탈퇴가 실패(500)할 수 있음.
-- **원인:** `AuthCommandService.deleteAllUserData` L150이 `userScrapRepository.deleteByUserId(userId)`를 호출하는데, 그 쿼리(`UserScrapRepository` L18)가 **`delete from UserScrap`이 아니라 `delete from UserQuizResult`**로 잘못 작성됨(복붙) → 스크랩 row가 안 지워진 채 L159 `userRepository.delete(user)` → `user_scraps`가 user_id를 참조 → FK 위반.
-```java
-// UserScrapRepository.deleteByUserId (L17-19)
-// AS-IS
-@Query("delete from UserQuizResult u where u.user.id = :userId")
-// TO-BE
-@Query("delete from UserScrap u where u.user.id = :userId")
+#### ③ ✅ [해결됨 · `907edf4`] 회원탈퇴 실패 — 스크랩을 안 지워서 FK 위반 (복붙 버그)
+> **수정 확인:** `UserScrapRepository.deleteByUserId` 쿼리가 `delete from UserScrap`으로 변경됨 → 탈퇴 시 user_scraps가 먼저 정상 삭제 → recommend_keywords 삭제 FK 위반 해소.
+
+<details><summary>당시 재현 에러/원인 (참고용)</summary>
+
+스크랩이 있는 계정 탈퇴 시 **500**. 실제 에러:
+```text
+서버 내부 오류가 발생했습니다: JDBC exception executing SQL
+[delete from recommend_keywords rk1_0 where rk1_0.user_id=?]
+ERROR: update or delete on table "recommend_keywords" violates foreign key constraint
+  "fkp763gt7wm2gvmsb8685y6qx1l" on table "user_scraps"
+  Detail: Key (id)=(37) is still referenced from table "user_scraps".
 ```
+원인: `AuthCommandService.deleteAllUserData` L150 `userScrapRepository.deleteByUserId`의 쿼리가 `delete from UserScrap`이 아니라 `delete from UserQuizResult`였음 → user_scraps가 안 지워진 채 L152 `recommend_keywords` 삭제 시 `user_scraps.recommend_keyword_id` 참조로 FK 위반.
+
+</details>
 
 ---
 
