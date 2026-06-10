@@ -303,8 +303,10 @@ export default function GraphScreen({
       let changed = false;
       const next = new Map(prev);
       allNodes.forEach(n => {
-        // 스크랩 목록(권위) 우선, 그래프 플래그는 보조
-        if ((scrappedIdSet.has(n.id) || n.scrapped) && !next.has(n.id)) {
+        // ♥는 "실제 스크랩 목록"(권위, 캐시 안 됨)만으로 판정.
+        // 그래프의 node.scrapped는 @Cacheable로 stale(가짜 true)일 수 있어 사용하지 않음
+        // (false ♥ → 첫 클릭이 DELETE로 빠져 404 나던 문제 방지).
+        if (scrappedIdSet.has(n.id) && !next.has(n.id)) {
           next.set(n.id, { id: n.id, label: n.label, persona: n.persona, summary: n.summary ?? '' });
           changed = true;
         }
