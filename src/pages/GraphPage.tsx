@@ -8,6 +8,7 @@ import BottomNav from '../components/layout/BottomNav';
 import Sidebar from '../components/layout/Sidebar';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import GraphScreen from './graph/GraphScreen';
+import ScrapGraphView from './graph/ScrapGraphView';
 import RankingScreen from './ranking/RankingScreen';
 import ProfileScreen from './profile/ProfileScreen';
 import { MOCK_SUMMARIES, MOCK_USER_GAME, NODE_UNLOCK_LEVELS, xpForLevel, tierOf } from '../mocks';
@@ -241,6 +242,8 @@ function ScrapScreen({
   onOpen: (item: ScrappedKeyword) => void;
   forceMock: boolean;
 }) {
+  const [view, setView] = useState<'list' | 'graph'>('list');
+
   // 서버에 저장된 스크랩 보관함 (영속). 실패/미로그인 시 로컬 세션 스크랩(items)로 폴백.
   const { data: serverItems } = useQuery<ScrappedKeyword[]>({
     queryKey: ['scrapSummaries'],
@@ -256,8 +259,21 @@ function ScrapScreen({
     enabled: !forceMock,
   });
 
+  // 그래프 뷰용 스크랩 노드 (id·word·persona). 실패/mock 시 list에서 유도.
+  const { data: serverGraphNodes } = useQuery({
+    queryKey: ['scrapGraphNodes'],
+    queryFn: () =>
+      scrapApi.getScrapNodes()
+        .then(r => r.data.data?.content ?? [])
+        .catch(() => [] as { id: number; word: string; persona: string }[]),
+    enabled: !forceMock && view === 'graph',
+  });
+
   // 서버 스크랩이 있으면 그것, 없으면 로컬(이번 세션 스크랩) 표시
   const list = serverItems && serverItems.length > 0 ? serverItems : items;
+  const graphNodes = serverGraphNodes && serverGraphNodes.length > 0
+    ? serverGraphNodes
+    : list.map(it => ({ id: it.id, word: it.label, persona: it.persona }));
 
   return (
     <div style={{
@@ -288,7 +304,30 @@ function ScrapScreen({
         </div>
       </div>
 
-      {list.length === 0 ? (
+      {/* 리스트 / 그래프 토글 */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+        {([['list', '리스트'], ['graph', '그래프']] as const).map(([v, label]) => (
+          <button key={v} onClick={() => setView(v)} style={{
+            padding: '7px 16px', borderRadius: 999, border: 'none',
+            background: view === v ? '#0F1115' : '#FFFFFF',
+            color: view === v ? '#FFFFFF' : '#6B6B66',
+            fontSize: 13, fontWeight: 700, cursor: 'pointer',
+            fontFamily: 'Pretendard, -apple-system, system-ui, sans-serif',
+            boxShadow: view === v ? 'none' : '0 1px 4px rgba(15,17,21,0.06)',
+          }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {view === 'graph' && (
+        <ScrapGraphView
+          nodes={graphNodes}
+          onSelect={(n) => onOpen({ id: n.id, label: n.word, persona: n.persona, summary: '' })}
+        />
+      )}
+
+      {view === 'list' && (list.length === 0 ? (
         <div style={{
           marginTop: 24,
           padding: '34px 18px',
@@ -413,7 +452,7 @@ function ScrapScreen({
             );
           })}
         </div>
-      )}
+      ))}
     </div>
   );
 }
