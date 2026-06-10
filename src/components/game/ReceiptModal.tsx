@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import type { ReceiptData } from '../../types/game';
 
 interface ReceiptModalProps {
@@ -12,23 +13,50 @@ const SERRATED = `M0,0 Q10,14 20,0 Q30,14 40,0 Q50,14 60,0 Q70,14 80,0 Q90,14 10
   L400,14 L0,14 Z`;
 
 export default function ReceiptModal({ data, onClose }: ReceiptModalProps) {
-  // 프론트 단독 공유: 모바일은 네이티브 공유 시트(navigator.share)로 인스타·카톡 등 선택,
-  // 미지원(데스크톱 등)은 클립보드 복사로 폴백.
-  const handleShare = async () => {
-    const text =
-      `🧾 노딩고 데일리 인사이트\n오늘의 지식 칼로리 +50 XP · 새 시냅스 ${data.synapseFrom} → ${data.synapseTo}\n#노딩고 #지식그래프`;
-    const url = window.location.origin;
+  const receiptRef = useRef<HTMLDivElement>(null);
+
+  // 텍스트 폴백 (이미지 캡처 실패 시)
+  const shareText =
+    `🧾 노딩고 데일리 인사이트\n오늘의 지식 칼로리 +50 XP · 새 시냅스 ${data.synapseFrom} → ${data.synapseTo}\n#노딩고 #지식그래프`;
+
+  const shareTextFallback = async () => {
     try {
       if (typeof navigator.share === 'function') {
-        await navigator.share({ title: '노딩고 데일리 인사이트', text, url });
+        await navigator.share({ title: '노딩고 데일리 인사이트', text: shareText, url: window.location.origin });
       } else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(`${text}\n${url}`);
-        alert('공유 문구를 클립보드에 복사했어요! 원하는 곳에 붙여넣어 공유하세요.');
+        await navigator.clipboard.writeText(`${shareText}\n${window.location.origin}`);
+        alert('공유 문구를 클립보드에 복사했어요!');
+      }
+    } catch { /* 취소 등 무시 */ }
+  };
+
+  // 영수증을 PNG 이미지로 떠서 공유 → 인스타 등에 실제 이미지로 전송.
+  // 모바일: navigator.share(files) / 데스크톱·미지원: PNG 다운로드 / 실패: 텍스트 폴백
+  const handleShare = async () => {
+    const node = receiptRef.current;
+    if (!node) { void shareTextFallback(); return; }
+    try {
+      // 무거운 라이브러리 → 공유 클릭 시에만 동적 로딩 (별도 청크)
+      const { toBlob } = await import('html-to-image');
+      const blob = await toBlob(node, { pixelRatio: 2, backgroundColor: '#ffffff', cacheBust: true });
+      if (!blob) throw new Error('capture failed');
+      const file = new File([blob], `nodingo-receipt-${data.serial}.png`, { type: 'image/png' });
+
+      if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] }) && navigator.share) {
+        await navigator.share({ files: [file], title: '노딩고 데일리 인사이트', text: shareText });
       } else {
-        alert('이 브라우저에서는 공유를 지원하지 않아요.');
+        // 다운로드 폴백 (데스크톱 등) → 사용자가 직접 인스타에 업로드
+        const objUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objUrl;
+        a.download = `nodingo-receipt-${data.serial}.png`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(objUrl);
       }
     } catch {
-      // 사용자가 공유를 취소한 경우 등 — 무시
+      void shareTextFallback(); // 캡처/공유 실패 시 텍스트로
     }
   };
 
@@ -47,6 +75,8 @@ export default function ReceiptModal({ data, onClose }: ReceiptModalProps) {
         animation: 'nodingo-receipt-in 0.45s cubic-bezier(.3,1.4,.4,1) both',
         boxShadow: '0 -8px 48px rgba(15,17,21,0.22)',
       }}>
+        {/* receiptRef: 캡처 대상 (영수증 본문 + 톱니 가장자리, 버튼 제외) */}
+        <div ref={receiptRef} style={{ background: '#FFFFFF' }}>
         <div style={{
           padding: '26px 28px 24px',
           fontFamily: '"Courier New", "Courier", monospace',
@@ -118,6 +148,7 @@ export default function ReceiptModal({ data, onClose }: ReceiptModalProps) {
             <path d={SERRATED} fill="rgba(15,17,21,0.5)" />
           </svg>
         </div>
+        </div>{/* /receiptRef */}
 
         <div style={{
           background: '#FFFFFF',
