@@ -1372,6 +1372,60 @@ export default function GraphScreen({
                   )}
                 </div>
               </>
+            ) : selectedNode ? (
+              <>
+                {/* 요약이 없는 노드도 ♥로 스크랩 가능하도록 헤더 노출 */}
+                <div style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 10,
+                  padding: '4px 18px 10px', borderBottom: '1px solid #EFEEEA',
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: 10.5, fontWeight: 800, color: '#6B6B66',
+                      letterSpacing: '.06em', textTransform: 'uppercase',
+                    }}>
+                      {selectedNode.persona}
+                    </div>
+                    <div style={{ marginTop: 3, fontSize: 22, fontWeight: 900, color: '#0F1115', letterSpacing: '-0.03em' }}>
+                      {selectedNode.label}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => scrapMutation.mutate({
+                      node: { id: selectedNodeId!, label: selectedNode.label, persona: selectedNode.persona, summary: '' },
+                      shouldScrap: !scrappedNodes.has(selectedNodeId!),
+                    })}
+                    style={{
+                      width: 38, height: 38, borderRadius: '50%',
+                      background: scrappedNodes.has(selectedNodeId!) ? '#FFF1F3' : '#F4F4F0',
+                      color: scrappedNodes.has(selectedNodeId!) ? '#E8657A' : '#6B6B66',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      border: 'none', cursor: 'pointer', flexShrink: 0,
+                    }}
+                    aria-label="스크랩"
+                  >
+                    <svg viewBox="0 0 24 24"
+                      fill={scrappedNodes.has(selectedNodeId!) ? 'currentColor' : 'none'}
+                      stroke="currentColor" strokeWidth="2.2" width="18" height="18">
+                      <path d="M12 21s-7-4.35-9.4-8.25C.7 9.65 2.4 5.5 6.1 5.5c2.05 0 3.5 1.05 4.4 2.35C11.4 6.55 12.85 5.5 14.9 5.5c3.7 0 5.4 4.15 3.5 7.25C19 16.65 12 21 12 21z" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => setSheetOpen(false)}
+                    style={{
+                      width: 38, height: 38, borderRadius: '50%',
+                      background: '#F4F4F0', color: '#6B6B66',
+                      border: 'none', cursor: 'pointer', fontSize: 20, lineHeight: 1,
+                    }}
+                    aria-label="닫기"
+                  >
+                    ×
+                  </button>
+                </div>
+                <p style={{ fontSize: 13, color: '#9A9A94', textAlign: 'center', padding: '26px 18px', lineHeight: 1.6 }}>
+                  아직 이 키워드의 요약이 없어요.<br />그래도 ♥로 스크랩할 수 있어요.
+                </p>
+              </>
             ) : (
               <p style={{ fontSize: 14, color: '#6B6B66', textAlign: 'center', padding: 32 }}>
                 요약 정보가 없습니다.
