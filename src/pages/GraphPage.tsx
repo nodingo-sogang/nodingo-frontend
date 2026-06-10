@@ -243,6 +243,8 @@ function ScrapScreen({
   forceMock: boolean;
 }) {
   const [view, setView] = useState<'list' | 'graph'>('list');
+  // 그래프 노드 탭 시 메인 그래프로 이동하지 않고 바텀시트로 상세 표시
+  const [selected, setSelected] = useState<ScrappedKeyword | null>(null);
 
   // 서버에 저장된 스크랩 보관함 (영속). 실패/미로그인 시 로컬 세션 스크랩(items)로 폴백.
   const { data: serverItems } = useQuery<ScrappedKeyword[]>({
@@ -345,7 +347,10 @@ function ScrapScreen({
         <ScrapGraphView
           nodes={graphData.nodes}
           edges={graphData.edges}
-          onSelect={(n) => onOpen({ id: n.id, label: n.word, persona: n.persona, summary: '' })}
+          onSelect={(n) => {
+            const found = list.find(it => it.id === n.id);
+            setSelected(found ?? { id: n.id, label: n.word, persona: n.persona, summary: '' });
+          }}
         />
       )}
 
@@ -475,6 +480,104 @@ function ScrapScreen({
           })}
         </div>
       ))}
+
+      {/* 그래프 노드 탭 → 상세 바텀시트 */}
+      {selected && (() => {
+        const mock = MOCK_SUMMARIES[selected.id];
+        const news = fallbackNews(mock, selected);
+        return (
+          <div
+            onClick={() => setSelected(null)}
+            style={{
+              position: 'absolute', inset: 0, zIndex: 120,
+              background: 'rgba(15,17,21,0.34)',
+              display: 'flex', alignItems: 'flex-end',
+            }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                width: '100%', maxHeight: '78%', overflowY: 'auto',
+                background: '#FFFFFF',
+                borderTopLeftRadius: 28, borderTopRightRadius: 28,
+                padding: '10px 18px 22px',
+                boxShadow: '0 -16px 38px rgba(15,17,21,0.18)',
+                animation: 'nodingo-sheet-in 420ms cubic-bezier(.2,.7,.2,1)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+                <div style={{ width: 42, height: 4, borderRadius: 999, background: '#D8D8D2' }} />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{
+                  width: 9, height: 9, borderRadius: 999,
+                  background: '#E8657A', boxShadow: '0 0 8px #E8657A66',
+                }} />
+                <span style={{ fontSize: 20, fontWeight: 900, color: '#0F1115' }}>{selected.label}</span>
+                <span style={{
+                  marginLeft: 'auto', padding: '3px 9px', borderRadius: 999,
+                  background: '#F4F4F0', color: '#6B6B66', fontSize: 11, fontWeight: 800,
+                }}>
+                  {selected.persona}
+                </span>
+                <button onClick={() => setSelected(null)} style={{
+                  width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                  background: '#F4F4F0', color: '#6B6B66', border: 'none',
+                  cursor: 'pointer', fontSize: 18,
+                }}>×</button>
+              </div>
+
+              {selected.summary && (
+                <p style={{ marginTop: 10, fontSize: 13, lineHeight: 1.6, color: '#4A4C50' }}>
+                  {selected.summary.replace(/\*\*/g, '')}
+                </p>
+              )}
+
+              {news.length > 0 && (
+                <div style={{
+                  marginTop: 14, paddingTop: 14, borderTop: '1px dashed #ECECE8',
+                  display: 'flex', flexDirection: 'column', gap: 7,
+                }}>
+                  {news.slice(0, 3).map(article => (
+                    <a key={article.id} href={article.url} target="_blank" rel="noreferrer"
+                      style={{
+                        display: 'block', padding: '10px 11px', borderRadius: 14,
+                        background: '#FAF7F1', border: '1px solid #EFEEEA', textDecoration: 'none',
+                      }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        {article.outlet && (
+                          <span style={{
+                            padding: '2px 7px', borderRadius: 999, background: '#0F1115',
+                            color: '#FFFFFF', fontSize: 9.5, fontWeight: 800,
+                          }}>{article.outlet}</span>
+                        )}
+                        {article.date && (
+                          <span style={{ fontSize: 10.5, color: '#6B6B66', fontWeight: 700 }}>{article.date}</span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0F1115', lineHeight: 1.35 }}>
+                        {article.title}
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              )}
+
+              <button
+                onClick={() => { const it = selected; setSelected(null); onOpen(it); }}
+                style={{
+                  marginTop: 16, width: '100%', padding: '13px 0', borderRadius: 16,
+                  background: '#0F1115', color: '#FFFFFF', border: 'none',
+                  cursor: 'pointer', fontSize: 14, fontWeight: 800,
+                }}
+              >
+                메인 그래프에서 보기
+              </button>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
