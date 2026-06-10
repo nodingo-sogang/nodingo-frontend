@@ -259,21 +259,42 @@ function ScrapScreen({
     enabled: !forceMock,
   });
 
-  // 그래프 뷰용 스크랩 노드 (id·word·persona). 실패/mock 시 list에서 유도.
+  // 스크랩 그래프(노드+엣지) 신규 엔드포인트. 미배포/실패 시 null → 노드-only 폴백.
+  const { data: scrapGraph } = useQuery({
+    queryKey: ['scrapGraph'],
+    queryFn: () =>
+      scrapApi.getScrapGraph()
+        .then(r => {
+          const dd = r.data.data;
+          const nodes = (dd?.nodes ?? []).map(n => ({
+            id: n.id, word: n.word ?? n.label ?? String(n.id), persona: n.persona ?? '',
+          }));
+          const edges = (dd?.edges ?? []).map(e => ({ source: e.source, target: e.target, weight: e.weight ?? 0.5 }));
+          return { nodes, edges };
+        })
+        .catch(() => null),
+    enabled: !forceMock && view === 'graph',
+  });
+
+  // 그래프 뷰용 스크랩 노드 (엣지 엔드포인트 실패 시 폴백). 실패/mock 시 list에서 유도.
   const { data: serverGraphNodes } = useQuery({
     queryKey: ['scrapGraphNodes'],
     queryFn: () =>
       scrapApi.getScrapNodes()
         .then(r => r.data.data?.content ?? [])
         .catch(() => [] as { id: number; word: string; persona: string }[]),
-    enabled: !forceMock && view === 'graph',
+    enabled: !forceMock && view === 'graph' && (!scrapGraph || scrapGraph.nodes.length === 0),
   });
 
   // 서버 스크랩이 있으면 그것, 없으면 로컬(이번 세션 스크랩) 표시
   const list = serverItems && serverItems.length > 0 ? serverItems : items;
-  const graphNodes = serverGraphNodes && serverGraphNodes.length > 0
+  const fallbackNodes = serverGraphNodes && serverGraphNodes.length > 0
     ? serverGraphNodes
     : list.map(it => ({ id: it.id, word: it.label, persona: it.persona }));
+  // 엣지 포함 그래프 우선, 없으면 노드-only
+  const graphData = scrapGraph && scrapGraph.nodes.length > 0
+    ? scrapGraph
+    : { nodes: fallbackNodes, edges: [] as { source: number; target: number; weight: number }[] };
 
   return (
     <div style={{
@@ -322,7 +343,8 @@ function ScrapScreen({
 
       {view === 'graph' && (
         <ScrapGraphView
-          nodes={graphNodes}
+          nodes={graphData.nodes}
+          edges={graphData.edges}
           onSelect={(n) => onOpen({ id: n.id, label: n.word, persona: n.persona, summary: '' })}
         />
       )}

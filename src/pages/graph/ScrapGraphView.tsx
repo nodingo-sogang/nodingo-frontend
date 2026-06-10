@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { forceSimulation, forceManyBody, forceCenter, forceCollide, forceX, forceY } from 'd3-force';
+import { forceSimulation, forceManyBody, forceCenter, forceCollide, forceX, forceY, forceLink } from 'd3-force';
 
 export type ScrapGraphNode = { id: number; word: string; persona: string };
+export type ScrapGraphEdge = { source: number; target: number; weight?: number };
 type SimNode = ScrapGraphNode & { x: number; y: number };
+type SimLink = { source: number | SimNode; target: number | SimNode; weight?: number };
 
 const SVG_W = 360;
 const SVG_H = 460;
@@ -27,14 +29,18 @@ function displayLabel(label: string): string {
 
 interface Props {
   nodes: ScrapGraphNode[];
+  edges?: ScrapGraphEdge[];
   onSelect?: (node: ScrapGraphNode) => void;
 }
 
-export default function ScrapGraphView({ nodes, onSelect }: Props) {
+export default function ScrapGraphView({ nodes, edges = [], onSelect }: Props) {
   const [positions, setPositions] = useState<Map<number, { x: number; y: number }>>(new Map());
 
-  // 노드 집합이 실제로 바뀔 때만 시뮬레이션 재시작 (id 시그니처)
-  const sig = useMemo(() => nodes.map(n => n.id).join(','), [nodes]);
+  // 노드/엣지가 실제로 바뀔 때만 시뮬레이션 재시작 (시그니처)
+  const sig = useMemo(
+    () => nodes.map(n => n.id).join(',') + '|' + edges.map(e => `${e.source}-${e.target}`).join(','),
+    [nodes, edges],
+  );
 
   useEffect(() => {
     if (nodes.length === 0) { setPositions(new Map()); return; }
@@ -43,12 +49,23 @@ export default function ScrapGraphView({ nodes, onSelect }: Props) {
       const radius = 50 + (i % 4) * 30;
       return { ...n, x: SVG_W / 2 + Math.cos(angle) * radius, y: SVG_H / 2 + Math.sin(angle) * radius };
     });
+    // 노드 집합에 존재하는 엣지만 사용
+    const nodeIds = new Set(nodes.map(n => n.id));
+    const simLinks: SimLink[] = edges
+      .filter(e => nodeIds.has(e.source) && nodeIds.has(e.target))
+      .map(e => ({ source: e.source, target: e.target, weight: e.weight }));
     const sim = forceSimulation<SimNode>(simNodes)
       .force('charge', forceManyBody<SimNode>().strength(-130))
       .force('center', forceCenter<SimNode>(SVG_W / 2, SVG_H / 2).strength(0.5))
       .force('collide', forceCollide<SimNode>(38).strength(0.9))
       .force('x', forceX<SimNode>(SVG_W / 2).strength(0.06))
       .force('y', forceY<SimNode>(SVG_H / 2).strength(0.06));
+    if (simLinks.length > 0) {
+      sim.force('link', forceLink<SimNode, SimLink>(simLinks)
+        .id(n => n.id)
+        .distance(l => 70 + (1 - (l.weight ?? 0.5)) * 50)
+        .strength(l => 0.25 + (l.weight ?? 0.5) * 0.3));
+    }
     sim.on('tick', () => {
       simNodes.forEach(n => {
         n.x = Math.max(34, Math.min(SVG_W - 34, n.x));
@@ -78,6 +95,16 @@ export default function ScrapGraphView({ nodes, onSelect }: Props) {
   return (
     <div style={{ padding: '4px 8px 16px' }}>
       <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} width="100%" style={{ display: 'block', touchAction: 'manipulation' }}>
+        {/* 엣지(관계선) — 노드보다 먼저 그려 뒤에 깔리게 */}
+        {edges.map((e, i) => {
+          const s = positions.get(e.source);
+          const t = positions.get(e.target);
+          if (!s || !t) return null;
+          return (
+            <line key={`e${i}`} x1={s.x} y1={s.y} x2={t.x} y2={t.y}
+              stroke="#D8D8D2" strokeWidth={1.2} opacity={0.75} />
+          );
+        })}
         {nodes.map(n => {
           const p = positions.get(n.id);
           if (!p) return null;
