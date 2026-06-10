@@ -66,45 +66,60 @@ export default function ReceiptModal({ data, onClose }: ReceiptModalProps) {
       {/* ── 인스타 스토리용 공유 카드 (바깥 래퍼=화면 밖 / 안쪽=캡처 대상, 위치 스타일 없음) ── */}
       <div aria-hidden style={{ position: 'fixed', left: '-99999px', top: 0, pointerEvents: 'none' }}>
       <div ref={shareCardRef} style={{
-        width: 360, boxSizing: 'border-box',
-        padding: '36px 28px 30px',
-        background: 'linear-gradient(165deg,#5BBA6F 0%,#3E9E7E 48%,#4FA3E0 100%)',
+        width: 360, height: 640, boxSizing: 'border-box',   // 9:16 인스타 스토리 규격
+        padding: '46px 30px 40px',
+        background: 'linear-gradient(160deg,#5BBA6F 0%,#3E9E7E 50%,#4FA3E0 100%)',
         fontFamily: '"Pretendard", -apple-system, system-ui, sans-serif',
         color: '#FFFFFF',
+        position: 'relative', overflow: 'hidden',
+        display: 'flex', flexDirection: 'column',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 900, fontSize: 18, letterSpacing: '-0.02em' }}>
-          <span style={{ width: 22, height: 22, borderRadius: 7, background: '#FFFFFF', display: 'inline-block', boxShadow: '0 0 0 5px rgba(255,255,255,0.18)' }} />
-          Nodingo
-        </div>
-        <div style={{ marginTop: 22, fontSize: 12, fontWeight: 800, letterSpacing: '.14em', opacity: 0.92 }}>
-          오늘의 지식 영수증
-        </div>
-        <div style={{ marginTop: 6, fontSize: 27, fontWeight: 900, lineHeight: 1.28, letterSpacing: '-0.03em' }}>
-          {data.username} 님,<br />오늘도 지식 한 입 🧠
-        </div>
-        <div style={{ marginTop: 22, background: '#FFFFFF', color: '#0F1115', borderRadius: 22, padding: '18px 20px 16px', boxShadow: '0 10px 30px rgba(15,17,21,0.18)' }}>
-          {[
-            ['오늘의 지식 칼로리', '+50 XP'],
-            ['새로 연결된 시냅스', `${data.synapseFrom} → ${data.synapseTo}`],
-            ['일일 목표', 'CLEAR ✓'],
-            ['발급일', data.date],
-          ].map(([k, v], i, arr) => (
-            <div key={k} style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              padding: '7px 0', fontSize: 13.5,
-              borderBottom: i < arr.length - 1 ? '1px dashed #ECECE8' : 'none',
-            }}>
-              <span style={{ color: '#6B6B66', fontWeight: 700 }}>{k}</span>
-              <span style={{ fontWeight: 900 }}>{v}</span>
-            </div>
-          ))}
-          <div style={{ marginTop: 12, textAlign: 'center', fontFamily: '"Courier New", monospace', fontSize: 10, letterSpacing: 4, color: '#9A9A94' }}>
-            {data.serial}
+        {/* 배경 장식 원 */}
+        <div style={{ position: 'absolute', top: -70, right: -55, width: 190, height: 190, borderRadius: '50%', background: 'rgba(255,255,255,0.10)' }} />
+        <div style={{ position: 'absolute', bottom: -80, left: -65, width: 210, height: 210, borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
+
+        {/* 상단: 브랜드 + 헤드라인 */}
+        <div style={{ position: 'relative' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, fontWeight: 900, fontSize: 19, letterSpacing: '-0.02em' }}>
+            <span style={{ width: 24, height: 24, borderRadius: 8, background: '#FFFFFF', display: 'inline-block', boxShadow: '0 0 0 5px rgba(255,255,255,0.18)' }} />
+            Nodingo
+          </div>
+          <div style={{ marginTop: 28, fontSize: 12, fontWeight: 800, letterSpacing: '.16em', opacity: 0.9 }}>
+            오늘의 지식 영수증
+          </div>
+          <div style={{ marginTop: 8, fontSize: 29, fontWeight: 900, lineHeight: 1.3, letterSpacing: '-0.03em' }}>
+            {data.username} 님,<br />오늘도 지식 한 입 🧠
           </div>
         </div>
-        <div style={{ marginTop: 20, textAlign: 'center', fontSize: 11.5, fontWeight: 700, opacity: 0.92, lineHeight: 1.6 }}>
+
+        {/* 중앙: 흰 성과 패널 */}
+        <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center' }}>
+          <div style={{ width: '100%', background: '#FFFFFF', color: '#0F1115', borderRadius: 26, padding: '24px 24px 20px', boxShadow: '0 16px 42px rgba(15,17,21,0.24)' }}>
+            {[
+              ['오늘의 지식 칼로리', '+50 XP'],
+              ['새로 연결된 시냅스', `${data.synapseFrom} → ${data.synapseTo}`],
+              ['일일 목표', 'CLEAR ✓'],
+              ['발급일', data.date],
+            ].map(([k, v], i, arr) => (
+              <div key={k} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '9px 0', fontSize: 14.5,
+                borderBottom: i < arr.length - 1 ? '1px dashed #ECECE8' : 'none',
+              }}>
+                <span style={{ color: '#6B6B66', fontWeight: 700 }}>{k}</span>
+                <span style={{ fontWeight: 900 }}>{v}</span>
+              </div>
+            ))}
+            <div style={{ marginTop: 14, textAlign: 'center', fontFamily: '"Courier New", monospace', fontSize: 11, letterSpacing: 4, color: '#9A9A94' }}>
+              {data.serial}
+            </div>
+          </div>
+        </div>
+
+        {/* 하단: 브랜딩 */}
+        <div style={{ position: 'relative', textAlign: 'center', fontSize: 12.5, fontWeight: 700, opacity: 0.94, lineHeight: 1.7 }}>
           매일 뉴스로 나만의 지식지도를 키워요<br />
-          <span style={{ opacity: 0.8 }}>#노딩고 #지식그래프</span>
+          <span style={{ opacity: 0.82 }}>#노딩고 #지식그래프</span>
         </div>
       </div>
       </div>
