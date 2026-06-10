@@ -271,6 +271,9 @@ export interface RankingEntryResponse {
   weekXp?: number;
   /** 페르소나 enum 코드 (POLITICS/ECONOMY/...). 표시는 PERSONA_LABEL로 한글 변환 */
   persona?: string;
+  /** 네이버 프로필 이미지 URL (wire=snake, OpenAPI=camel 둘 다 수용) */
+  profile_image_url?: string | null;
+  profileImageUrl?: string | null;
   /** 백엔드 boolean 직렬화 흔들림 대응: is_me / me / isMe 모두 수용 */
   is_me?: boolean;
   me?: boolean;

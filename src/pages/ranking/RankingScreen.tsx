@@ -12,7 +12,7 @@ function toEntry(e: RankingEntryResponse): RankingEntry {
   return {
     rank: e.rank,
     name: e.nickname,
-    avatar: '',
+    avatar: e.profile_image_url ?? e.profileImageUrl ?? '',
     level: e.level,
     weekXp: e.week_xp ?? e.weekXp ?? 0,
     persona: personaLabel(e.persona),
@@ -456,9 +456,13 @@ export default function RankingScreen({ accentColor, userGame }: RankingScreenPr
                 overflow: 'hidden',
               }}>
                 <img
-                  src={tierOf(mapUser.level).characterImage}
+                  src={mapUser.avatar || tierOf(mapUser.level).characterImage}
                   alt={tierOf(mapUser.level).name}
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={(ev) => {
+                    const img = ev.currentTarget as HTMLImageElement;
+                    if (!img.dataset.fb) { img.dataset.fb = '1'; img.src = tierOf(mapUser.level).characterImage; }
+                  }}
                 />
               </div>
               <div style={{ flex: 1 }}>
