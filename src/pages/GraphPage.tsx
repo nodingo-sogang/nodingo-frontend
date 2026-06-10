@@ -9,12 +9,14 @@ import Sidebar from '../components/layout/Sidebar';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import GraphScreen from './graph/GraphScreen';
 import ScrapGraphView from './graph/ScrapGraphView';
+import Skeleton from '../components/common/Skeleton';
 import RankingScreen from './ranking/RankingScreen';
 import ProfileScreen from './profile/ProfileScreen';
 import { MOCK_SUMMARIES, MOCK_USER_GAME, NODE_UNLOCK_LEVELS, xpForLevel, tierOf } from '../mocks';
 import { USE_MOCK } from '../api/config';
 import { gameApi } from '../api/game';
 import { scrapApi } from '../api/scrap';
+import { graphApi } from '../api/graph';
 import type { UserGame, Badge, ReceiptData } from '../types/game';
 import type { NodeSummaryResponse, BadgeResponse } from '../types';
 
@@ -245,6 +247,14 @@ function ScrapScreen({
   const [view, setView] = useState<'list' | 'graph'>('list');
   // 그래프 노드 탭 시 메인 그래프로 이동하지 않고 바텀시트로 상세 표시
   const [selected, setSelected] = useState<ScrappedKeyword | null>(null);
+
+  // 바텀시트용 실제 요약 + 관련 원문 (메인 그래프와 동일 엔드포인트). 실패 시 null → mock 폴백.
+  const { data: nodeDetail, isLoading: detailLoading } = useQuery<NodeSummaryResponse | null>({
+    queryKey: ['scrapNodeDetail', selected?.id],
+    queryFn: () => graphApi.getNodeSummary(selected!.id).then(r => r.data.data).catch(() => null),
+    enabled: !forceMock && selected != null,
+    staleTime: 60_000,
+  });
 
   // 서버에 저장된 스크랩 보관함 (영속). 실패/미로그인 시 로컬 세션 스크랩(items)로 폴백.
   const { data: serverItems } = useQuery<ScrappedKeyword[]>({
@@ -483,8 +493,12 @@ function ScrapScreen({
 
       {/* 그래프 노드 탭 → 상세 바텀시트 */}
       {selected && (() => {
-        const mock = MOCK_SUMMARIES[selected.id];
-        const news = fallbackNews(mock, selected);
+        // 실제 요약/원문 우선(메인 그래프와 동일 엔드포인트), mock 모드에선 합성 카드 폴백.
+        const realNews = nodeDetail?.news ?? [];
+        const summaryText = nodeDetail?.summary ?? selected.summary;
+        const news = realNews.length > 0
+          ? realNews
+          : (forceMock ? fallbackNews(MOCK_SUMMARIES[selected.id], selected) : []);
         return (
           <div
             onClick={() => setSelected(null)}
@@ -528,9 +542,21 @@ function ScrapScreen({
                 }}>×</button>
               </div>
 
-              {selected.summary && (
+              {summaryText && (
                 <p style={{ marginTop: 10, fontSize: 13, lineHeight: 1.6, color: '#4A4C50' }}>
-                  {selected.summary.replace(/\*\*/g, '')}
+                  {summaryText.replace(/\*\*/g, '')}
+                </p>
+              )}
+
+              {/* 관련 원문 로딩/빈 상태 */}
+              {detailLoading && news.length === 0 && (
+                <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {[0, 1].map(i => <Skeleton key={i} height={52} radius={14} />)}
+                </div>
+              )}
+              {!detailLoading && news.length === 0 && (
+                <p style={{ marginTop: 14, fontSize: 12, color: '#9A9A94', fontWeight: 600 }}>
+                  관련 뉴스 원문이 아직 없어요.
                 </p>
               )}
 
@@ -539,6 +565,9 @@ function ScrapScreen({
                   marginTop: 14, paddingTop: 14, borderTop: '1px dashed #ECECE8',
                   display: 'flex', flexDirection: 'column', gap: 7,
                 }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: '#6B6B66', letterSpacing: '.04em' }}>
+                    관련 뉴스 원문 · {Math.min(news.length, 3)}
+                  </div>
                   {news.slice(0, 3).map(article => (
                     <a key={article.id} href={article.url} target="_blank" rel="noreferrer"
                       style={{
