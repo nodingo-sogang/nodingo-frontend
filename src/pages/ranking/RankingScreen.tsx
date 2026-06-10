@@ -347,23 +347,39 @@ export default function RankingScreen({ accentColor, userGame }: RankingScreenPr
 
       <Podium entries={top3} accentColor={accentColor} />
 
-      <div style={{
-        margin: '14px 16px 0',
-        background: '#FFFFFF',
-        borderRadius: 22, padding: 8,
-        boxShadow: '0 2px 8px rgba(15,17,21,0.04)',
-        display: 'flex', flexDirection: 'column', gap: 4,
-      }}>
-        {rest.map(e => (
-          <RankRow
-            key={e.rank}
-            entry={e}
-            accentColor={accentColor}
-            onPoke={(entry) => showToast(`${entry.name}님에게 툭 건드리기를 보냈어요`)}
-            onOpenMap={(entry) => setMapUser(entry)}
-          />
-        ))}
-      </div>
+      {rest.length > 0 ? (
+        <div style={{
+          margin: '14px 16px 0',
+          background: '#FFFFFF',
+          borderRadius: 22, padding: 8,
+          boxShadow: '0 2px 8px rgba(15,17,21,0.04)',
+          display: 'flex', flexDirection: 'column', gap: 4,
+        }}>
+          {rest.map(e => (
+            <RankRow
+              key={e.rank}
+              entry={e}
+              accentColor={accentColor}
+              onPoke={(entry) => showToast(`${entry.name}님에게 툭 건드리기를 보냈어요`)}
+              onOpenMap={(entry) => setMapUser(entry)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div style={{
+          margin: '14px 16px 0',
+          padding: '22px 18px',
+          textAlign: 'center',
+          color: '#9A9A94',
+          fontSize: 13,
+          fontWeight: 700,
+          lineHeight: 1.6,
+        }}>
+          {rankTab === 'friends'
+            ? '친구를 더 추가하면 이 랭킹이 채워져요! 🤝'
+            : '아직 표시할 랭킹이 더 없어요.'}
+        </div>
+      )}
 
       <div style={{ flex: 1 }} />
 
