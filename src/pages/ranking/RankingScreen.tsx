@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MOCK_RANKING_FRIENDS, MOCK_RANKING_PERSONA, tierOf, xpForLevel } from '../../mocks';
 import FriendManageSheet from '../../components/social/FriendManageSheet';
+import Skeleton from '../../components/common/Skeleton';
 import { rankingApi } from '../../api/ranking';
 import { personaLabel } from '../../types';
 import type { RankingEntryResponse, RankingListResponse } from '../../types';
@@ -37,6 +38,40 @@ function mockRanking(tab: 'friends' | 'persona'): MappedRanking {
 
 const PODIUM_COLORS = ['#F5B82E', '#C0C0C0', '#CD7F32'];
 const PODIUM_HEIGHTS = [84, 64, 52];
+
+// 로딩 스켈레톤 — 시상대(3) + 리스트(4행) 형태를 그대로 흉내
+function RankingSkeleton() {
+  const PODIUM = [1, 0, 2];
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 10, padding: '8px 20px 0' }}>
+        {PODIUM.map((i) => (
+          <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+            <Skeleton width={42} height={42} radius="50%" />
+            <Skeleton width={48} height={11} />
+            <Skeleton width={74} height={PODIUM_HEIGHTS[i]} radius="18px 18px 8px 8px" />
+          </div>
+        ))}
+      </div>
+      <div style={{
+        margin: '14px 16px 0', background: '#FFFFFF', borderRadius: 22, padding: 8,
+        boxShadow: '0 2px 8px rgba(15,17,21,0.04)', display: 'flex', flexDirection: 'column', gap: 4,
+      }}>
+        {[0, 1, 2, 3].map(i => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 10px' }}>
+            <Skeleton width={20} height={14} />
+            <Skeleton width={34} height={34} radius="50%" />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <Skeleton width="55%" height={13} />
+              <Skeleton width="35%" height={11} />
+            </div>
+            <Skeleton width={46} height={14} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 interface PodiumProps { entries: RankingEntry[]; accentColor: string }
 
@@ -220,15 +255,16 @@ export default function RankingScreen({ accentColor, userGame }: RankingScreenPr
   const [toast, setToast] = useState('');
   const [mapUser, setMapUser] = useState<RankingEntry | null>(null);
   const [friendSheet, setFriendSheet] = useState(false);
-  // 실 API 조회 (실패 시 mock 폴백)
-  const { data: ranking } = useQuery<MappedRanking>({
+  // 실 API 조회 (실패 시 mock 폴백). placeholderData는 두지 않음
+  // → 로딩 중엔 mock이 깜빡이지 않고 스켈레톤이 보이고, 도착하면 라이브로 채워짐.
+  const { data: ranking, isLoading } = useQuery<MappedRanking>({
     queryKey: ['ranking', rankTab],
     queryFn: () =>
       rankingApi.getRanking(rankTab === 'friends' ? 'FRIENDS' : 'PERSONA')
         .then(r => mapRanking(r.data.data))
         .catch(() => mockRanking(rankTab)),
-    placeholderData: () => mockRanking(rankTab),
   });
+  const loading = isLoading || !ranking;
 
   // 본인(me) 항목만 game에서 받은 실제 닉네임·네이버 프로필 이미지로 덮어씀.
   // (다른 유저는 랭킹 API가 프로필 이미지를 주지 않아 티어 캐릭터로 표시)
@@ -345,9 +381,11 @@ export default function RankingScreen({ accentColor, userGame }: RankingScreenPr
         </button>
       </div>
 
-      <Podium entries={top3} accentColor={accentColor} />
+      {loading && <RankingSkeleton />}
 
-      {rest.length > 0 ? (
+      {!loading && <Podium entries={top3} accentColor={accentColor} />}
+
+      {!loading && (rest.length > 0 ? (
         <div style={{
           margin: '14px 16px 0',
           background: '#FFFFFF',
@@ -379,7 +417,7 @@ export default function RankingScreen({ accentColor, userGame }: RankingScreenPr
             ? '친구를 더 추가하면 이 랭킹이 채워져요! 🤝'
             : '아직 표시할 랭킹이 더 없어요.'}
         </div>
-      )}
+      ))}
 
       <div style={{ flex: 1 }} />
 

@@ -7,6 +7,7 @@ import { useAuthStore } from '../store/authStore';
 import type { UserPersona, KeywordResponse } from '../types';
 import { PERSONA_LABEL } from '../types';
 import { MOCK_PERSONAS, MOCK_MACRO, MOCK_MACRO_BY_PERSONA, MOCK_SPECIFIC } from '../mocks';
+import Skeleton from '../components/common/Skeleton';
 import styles from './OnboardingPage.module.css';
 
 type Step = 'persona' | 'macro' | 'specific' | 'loading';
@@ -46,7 +47,6 @@ export default function OnboardingPage() {
     queryKey: ['personas'],
     queryFn: () =>
       userApi.getPersonas().then((r) => r.data.data).catch(() => MOCK_PERSONAS),
-    placeholderData: MOCK_PERSONAS,
   });
 
   const personaMock = selectedPersona
@@ -62,7 +62,6 @@ export default function OnboardingPage() {
         return d?.contents?.length ? d : personaMock;
       }).catch(() => personaMock),
     enabled: !!selectedPersona && step === 'macro',
-    placeholderData: personaMock,
   });
 
   const { data: specificData, isFetching: specificFetching } = useQuery({
@@ -73,7 +72,6 @@ export default function OnboardingPage() {
         return d?.contents?.length ? d : MOCK_SPECIFIC;
       }).catch(() => MOCK_SPECIFIC),
     enabled: !!selectedMacro && step === 'specific',
-    placeholderData: MOCK_SPECIFIC,
   });
 
   const { mutate: submitOnboarding } = useMutation({
@@ -287,7 +285,11 @@ export default function OnboardingPage() {
           </h1>
           <p className={styles.sub}>관심 주제를 하나 선택해주세요</p>
           {macroFetching ? (
-            <div className={styles.loader} />
+            <div className={styles.grid}>
+              {[0, 1, 2, 3, 4, 5].map(i => (
+                <Skeleton key={i} height={58} radius={16} />
+              ))}
+            </div>
           ) : (
             <div className={styles.grid}>
               {macroKeywords.map((kw) => (
@@ -323,7 +325,11 @@ export default function OnboardingPage() {
             최대 6개까지 선택 가능해요 ({selectedSpecific.length}/6)
           </p>
           {specificFetching ? (
-            <div className={styles.loader} />
+            <div className={styles.chipGrid}>
+              {[64, 88, 72, 96, 80, 60, 100, 76].map((w, i) => (
+                <Skeleton key={i} width={w} height={36} radius={999} />
+              ))}
+            </div>
           ) : (
             <>
               <div className={styles.chipGrid}>

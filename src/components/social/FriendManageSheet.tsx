@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { tierOf } from '../../mocks';
 import { MOCK_FRIENDS, MOCK_FRIEND_REQUESTS } from '../../mocks';
 import { friendApi } from '../../api/friend';
+import Skeleton from '../common/Skeleton';
 import type { FriendProfile } from '../../types/game';
 
 interface FriendManageSheetProps {
@@ -26,16 +27,15 @@ export default function FriendManageSheet({ accentColor, onClose }: FriendManage
     window.setTimeout(() => setToast(''), 1800);
   };
 
-  // 내 친구 목록 / 받은 요청 (실패 시 mock 폴백)
-  const { data: friends = [], refetch: refetchFriends } = useQuery<FriendProfile[]>({
+  // 내 친구 목록 / 받은 요청 (실패 시 mock 폴백).
+  // placeholderData 없음 → 로딩 중 mock 깜빡임 대신 스켈레톤 표시.
+  const { data: friends = [], isLoading: friendsLoading, refetch: refetchFriends } = useQuery<FriendProfile[]>({
     queryKey: ['friends'],
     queryFn: () => friendApi.getFriends().catch(() => MOCK_FRIENDS),
-    placeholderData: MOCK_FRIENDS,
   });
   const { data: requests = [], refetch: refetchRequests } = useQuery<FriendProfile[]>({
     queryKey: ['friendRequests'],
     queryFn: () => friendApi.getReceivedRequests().catch(() => MOCK_FRIEND_REQUESTS),
-    placeholderData: MOCK_FRIEND_REQUESTS,
   });
 
   const handleSearch = async () => {
@@ -237,8 +237,24 @@ export default function FriendManageSheet({ accentColor, onClose }: FriendManage
           )}
 
           {/* 내 친구 */}
-          {sectionLabel(`내 친구 · ${friends.length}`)}
-          {friends.length === 0 ? (
+          {sectionLabel(friendsLoading ? '내 친구' : `내 친구 · ${friends.length}`)}
+          {friendsLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {[0, 1, 2].map(i => (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: 11,
+                  padding: '10px 12px', borderRadius: 16,
+                  background: '#FFFFFF', border: '1px solid #EFEEEA',
+                }}>
+                  <Skeleton width={38} height={38} radius="50%" />
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <Skeleton width="45%" height={13} />
+                    <Skeleton width="60%" height={11} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : friends.length === 0 ? (
             <div style={{
               padding: '24px 16px', borderRadius: 16, background: '#FAF7F1',
               textAlign: 'center', color: '#6B6B66', fontSize: 13, fontWeight: 600,

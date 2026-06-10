@@ -60,6 +60,21 @@ body {
   animation: nodingo-pulse 1.8s ease-out infinite;
 }
 
+/* 재사용 스켈레톤 — 로딩 중 목업을 깜빡이지 않고 회색 블록을 흐르게 표시 */
+@keyframes nodingo-skeleton {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.nodingo-skel {
+  border-radius: 10px;
+  background: linear-gradient(100deg, #ECECE7 30%, #F6F5F1 50%, #ECECE7 70%);
+  background-size: 200% 100%;
+  animation: nodingo-skeleton 1.3s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nodingo-skel { animation: none; background: #ECECE7; }
+}
+
 /* 앱 화면 바깥 영역(shell): GraphPage 전용 래퍼.
    데스크톱에서 컬럼 양옆을 페이지 배경으로 채워 좌우 늘어남을 방지한다.
    (body 전역을 건드리지 않아 랜딩/로그인 페이지엔 영향 없음) */
