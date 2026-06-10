@@ -601,6 +601,12 @@ export default function GraphPage() {
   const [scrappedKeywords, setScrappedKeywords] = useState<ScrappedKeyword[]>([]);
 
   const prevLevelRef = useRef(userGame.level);
+  // 서버 동기화 전후로 새로 획득한 뱃지를 감지해 팝업 (퀴즈·스크랩·탐험·출석 전부 커버).
+  // 첫 로드 때 이미 가진 뱃지는 팝업하지 않도록 직전 획득셋을 ref로 보관.
+  const prevBadgeIdsRef = useRef<Set<string>>(new Set());
+  // 기준선이 한 번이라도 잡힌 뒤부터만 "신규 획득"으로 판정 (첫 성공 fetch 때 보유분 일괄 팝업 방지)
+  const badgeBaselineRef = useRef(false);
+  const [badgeQueue, setBadgeQueue] = useState<Badge[]>([]);
 
   // mock(데모) 모드 한정: 일일 첫 방문 보너스. 라이브는 서버가 출석 처리하므로 제외.
   useEffect(() => {
@@ -630,6 +636,18 @@ export default function GraphPage() {
       const serverBadges = badgesRes?.data.data?.badges;
       if (profile && suppressReward) {
         prevLevelRef.current = profile.user_game.level;
+      }
+      // 뱃지 획득 감지: 서버가 준 earned 집합을 직전과 비교 → 새로 켜진 뱃지만 팝업 큐에 추가.
+      // 첫 로드(suppressReward)면 팝업 없이 기준선만 세팅.
+      if (serverBadges && serverBadges.length > 0) {
+        const mapped = serverBadges.map(toBadge);
+        const earnedIds = new Set(mapped.filter(b => b.earned).map(b => b.id));
+        if (!suppressReward && badgeBaselineRef.current) {
+          const newly = mapped.filter(b => b.earned && !prevBadgeIdsRef.current.has(b.id));
+          if (newly.length > 0) setBadgeQueue(q => [...q, ...newly]);
+        }
+        prevBadgeIdsRef.current = earnedIds;
+        badgeBaselineRef.current = true;
       }
       setUserGame(prev => ({
         ...prev,
@@ -680,6 +698,14 @@ export default function GraphPage() {
       });
     }
   }, [userGame.level]);
+
+  // 뱃지 획득 팝업 큐 소진: 다른 보상 팝업이 없을 때 한 개씩 표시 (레벨업과 충돌 방지).
+  useEffect(() => {
+    if (reward != null || badgeQueue.length === 0) return;
+    const [next, ...rest] = badgeQueue;
+    setBadgeQueue(rest);
+    setReward({ kind: 'badge', badge: next, tierColor: tierOf(userGame.level).color });
+  }, [reward, badgeQueue, userGame.level]);
 
   // Watch for badge conditions (라이브는 서버가 뱃지를 판정·지급하므로 로컬 계산/팝업 비활성화 → 환영 뱃지 재발급 방지)
   useEffect(() => {
