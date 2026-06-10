@@ -12,6 +12,26 @@ const SERRATED = `M0,0 Q10,14 20,0 Q30,14 40,0 Q50,14 60,0 Q70,14 80,0 Q90,14 10
   L400,14 L0,14 Z`;
 
 export default function ReceiptModal({ data, onClose }: ReceiptModalProps) {
+  // 프론트 단독 공유: 모바일은 네이티브 공유 시트(navigator.share)로 인스타·카톡 등 선택,
+  // 미지원(데스크톱 등)은 클립보드 복사로 폴백.
+  const handleShare = async () => {
+    const text =
+      `🧾 노딩고 데일리 인사이트\n오늘의 지식 칼로리 +50 XP · 새 시냅스 ${data.synapseFrom} → ${data.synapseTo}\n#노딩고 #지식그래프`;
+    const url = window.location.origin;
+    try {
+      if (typeof navigator.share === 'function') {
+        await navigator.share({ title: '노딩고 데일리 인사이트', text, url });
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(`${text}\n${url}`);
+        alert('공유 문구를 클립보드에 복사했어요! 원하는 곳에 붙여넣어 공유하세요.');
+      } else {
+        alert('이 브라우저에서는 공유를 지원하지 않아요.');
+      }
+    } catch {
+      // 사용자가 공유를 취소한 경우 등 — 무시
+    }
+  };
+
   return (
     <div style={{
       position: 'absolute', inset: 0, zIndex: 200,
@@ -110,7 +130,7 @@ export default function ReceiptModal({ data, onClose }: ReceiptModalProps) {
             fontFamily: 'Pretendard, -apple-system, system-ui, sans-serif',
           }}>닫기</button>
           <button
-            onClick={() => alert('공유 기능 준비 중')}
+            onClick={handleShare}
             style={{
               flex: 1.4, padding: 13, borderRadius: 13, border: 'none',
               background: 'linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045)',
@@ -119,7 +139,7 @@ export default function ReceiptModal({ data, onClose }: ReceiptModalProps) {
               fontFamily: 'Pretendard, -apple-system, system-ui, sans-serif',
             }}
           >
-            Instagram 공유
+            📤 공유하기
           </button>
         </div>
       </div>

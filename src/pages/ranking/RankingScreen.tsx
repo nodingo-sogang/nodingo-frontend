@@ -181,7 +181,7 @@ function RankRow({ entry, accentColor, onPoke, onOpenMap }: RankRowProps) {
           </button>
           <button
             onClick={() => onOpenMap?.(entry)}
-            title="지식지도 보기"
+            title="프로필 보기"
             style={{
               width: 28, height: 28, borderRadius: '50%',
               background: '#F4F4F0', color: '#6B6B66',
@@ -430,7 +430,7 @@ export default function RankingScreen({ accentColor, userGame }: RankingScreenPr
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 18, fontWeight: 900, color: '#0F1115' }}>
-                  {mapUser.name}님의 지식지도
+                  {mapUser.name}님
                 </div>
                 <div style={{ fontSize: 12, color: '#6B6B66', marginTop: 2 }}>
                   {tierOf(mapUser.level).name} · Lv {mapUser.level} · {mapUser.weekXp.toLocaleString()} XP
@@ -445,37 +445,27 @@ export default function RankingScreen({ accentColor, userGame }: RankingScreenPr
                 ×
               </button>
             </div>
-            <div style={{
-              height: 188,
-              borderRadius: 20,
-              background: '#FAF7F1',
-              position: 'relative',
-              overflow: 'hidden',
-              border: '1px solid #EFEEEA',
-            }}>
-              <svg viewBox="0 0 320 188" width="100%" height="100%">
-                <line x1="160" y1="94" x2="92" y2="68" stroke={tierOf(mapUser.level).color} strokeWidth="1.4" opacity="0.7" />
-                <line x1="160" y1="94" x2="224" y2="56" stroke={tierOf(mapUser.level).color} strokeWidth="1.4" opacity="0.7" />
-                <line x1="160" y1="94" x2="232" y2="132" stroke="#D8D8D2" strokeWidth="1" />
-                <line x1="160" y1="94" x2="86" y2="128" stroke="#D8D8D2" strokeWidth="1" />
-                {[
-                  [160, 94, 24, mapUser.name],
-                  [92, 68, 17, '금리'],
-                  [224, 56, 17, 'AI 규제'],
-                  [232, 132, 14, '대선'],
-                  [86, 128, 14, '복지정책'],
-                ].map(([x, y, r, label]) => (
-                  <g key={String(label)}>
-                    <circle cx={Number(x)} cy={Number(y)} r={Number(r)} fill="#FFFFFF" stroke={tierOf(mapUser.level).color} strokeWidth="2" />
-                    <text x={Number(x)} y={Number(y) + Number(r) + 14} textAnchor="middle" fontSize="11" fontWeight="800" fill="#0F1115">
-                      {label}
-                    </text>
-                  </g>
-                ))}
-              </svg>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {[
+                { label: '랭킹', sub: '', value: `${mapUser.rank}위`, icon: '🏆' },
+                { label: '레벨', sub: tierOf(mapUser.level).name, value: `Lv ${mapUser.level}`, icon: '⭐' },
+                { label: '관심분야', sub: '', value: mapUser.persona ? `#${mapUser.persona}` : '—', icon: '🎯' },
+                { label: '주간 XP', sub: '', value: `${mapUser.weekXp.toLocaleString()} XP`, icon: '🔥' },
+              ].map(s => (
+                <div key={s.label} style={{
+                  background: '#FAF7F1', borderRadius: 16, padding: '12px 14px',
+                  border: '1px solid #EFEEEA',
+                }}>
+                  <div style={{ fontSize: 16 }}>{s.icon}</div>
+                  <div style={{ fontSize: 17, fontWeight: 900, color: '#0F1115', marginTop: 2 }}>{s.value}</div>
+                  <div style={{ fontSize: 10.5, color: '#6B6B66', marginTop: 1 }}>
+                    {s.label}{s.sub ? ` · ${s.sub}` : ''}
+                  </div>
+                </div>
+              ))}
             </div>
-            <button onClick={() => showToast(`${mapUser.name}님의 지식지도 탐색은 발표용 미리보기예요`)} style={{
-              marginTop: 12,
+            <button onClick={() => setMapUser(null)} style={{
+              marginTop: 14,
               width: '100%',
               padding: '13px 0',
               borderRadius: 18,
@@ -486,7 +476,7 @@ export default function RankingScreen({ accentColor, userGame }: RankingScreenPr
               fontSize: 14,
               fontWeight: 800,
             }}>
-              지식지도 방문하기
+              닫기
             </button>
           </div>
         </div>
