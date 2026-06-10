@@ -72,9 +72,13 @@ function Podium({ entries, accentColor }: PodiumProps) {
               boxShadow: '0 4px 10px rgba(15,17,21,0.10)',
             }}>
               <img
-                src={tierOf(e.level).characterImage}
+                src={e.avatar || tierOf(e.level).characterImage}
                 alt={tierOf(e.level).name}
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                onError={(ev) => {
+                  const img = ev.currentTarget as HTMLImageElement;
+                  if (!img.dataset.fb) { img.dataset.fb = '1'; img.src = tierOf(e.level).characterImage; }
+                }}
               />
             </div>
             <div style={{ fontSize: 12, fontWeight: 800, color: '#0F1115', textAlign: 'center', maxWidth: 68 }}>
@@ -135,9 +139,13 @@ function RankRow({ entry, accentColor, onPoke, onOpenMap }: RankRowProps) {
         flexShrink: 0,
       }}>
         <img
-          src={tier.characterImage}
+          src={entry.avatar || tier.characterImage}
           alt={tier.name}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          onError={(ev) => {
+            const img = ev.currentTarget as HTMLImageElement;
+            if (!img.dataset.fb) { img.dataset.fb = '1'; img.src = tier.characterImage; }
+          }}
         />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -222,10 +230,15 @@ export default function RankingScreen({ accentColor, userGame }: RankingScreenPr
     placeholderData: () => mockRanking(rankTab),
   });
 
-  const entries = ranking?.entries ?? [];
+  // 본인(me) 항목만 game에서 받은 실제 닉네임·네이버 프로필 이미지로 덮어씀.
+  // (다른 유저는 랭킹 API가 프로필 이미지를 주지 않아 티어 캐릭터로 표시)
+  const overrideMe = (e: RankingEntry): RankingEntry =>
+    e.isMe ? { ...e, name: userGame.name, avatar: userGame.profileImageUrl ?? '' } : e;
+  const entries = (ranking?.entries ?? []).map(overrideMe);
   const top3 = entries.filter(e => e.rank <= 3);
   const rest = entries.filter(e => e.rank > 3 && !e.isMe);
-  const me = ranking?.myEntry ?? entries.find(e => e.isMe);
+  const meRaw = ranking?.myEntry ?? entries.find(e => e.isMe);
+  const me = meRaw ? overrideMe(meRaw) : undefined;
   const myTier = tierOf(userGame.level);
   const neededXp = xpForLevel(userGame.level);
   const weekXp = me?.weekXp ?? userGame.xp;
@@ -271,9 +284,13 @@ export default function RankingScreen({ accentColor, userGame }: RankingScreenPr
           flexShrink: 0,
         }}>
           <img
-            src={myTier.characterImage}
+            src={userGame.profileImageUrl || myTier.characterImage}
             alt={myTier.name}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            onError={(e) => {
+              const img = e.currentTarget as HTMLImageElement;
+              if (!img.dataset.fb) { img.dataset.fb = '1'; img.src = myTier.characterImage; }
+            }}
           />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
