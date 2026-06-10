@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { tierOf } from '../../mocks';
-import type { UserGame, Badge } from '../../types/game';
+import type { UserGame, Badge, ReceiptData } from '../../types/game';
 import { useAuthStore } from '../../store/authStore';
 
 interface ProfileScreenProps {
   userGame: UserGame;
+  /** 오늘 발급된 영수증 (있으면 "다시 보기" 노출) */
+  lastReceipt?: ReceiptData | null;
+  onShowReceipt?: () => void;
 }
 
 const CATEGORY_ICON: Record<string, string> = {
@@ -32,7 +35,7 @@ function BadgeTile({ badge }: BadgeTileProps) {
   );
 }
 
-export default function ProfileScreen({ userGame }: ProfileScreenProps) {
+export default function ProfileScreen({ userGame, lastReceipt, onShowReceipt }: ProfileScreenProps) {
   const { logout, withdraw } = useAuthStore();
   const tier = tierOf(userGame.level);
   const [confirmWithdraw, setConfirmWithdraw] = useState(false);
@@ -123,8 +126,22 @@ export default function ProfileScreen({ userGame }: ProfileScreenProps) {
         </div>
       </div>
 
+      {lastReceipt && (
+        <button onClick={onShowReceipt} style={{
+          margin: '18px 16px 0',
+          width: 'calc(100% - 32px)', padding: 14, borderRadius: 18,
+          border: 'none',
+          background: tier.soft, color: tier.color,
+          fontSize: 14, fontWeight: 800, cursor: 'pointer',
+          fontFamily: 'Pretendard, -apple-system, system-ui, sans-serif',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        }}>
+          🧾 오늘의 영수증 다시 보기
+        </button>
+      )}
+
       <button onClick={logout} style={{
-        margin: '18px 16px 0',
+        margin: `${lastReceipt ? 10 : 18}px 16px 0`,
         width: 'calc(100% - 32px)', padding: 14, borderRadius: 18,
         border: 'none',
         background: '#FFFFFF', color: '#6B6B66',

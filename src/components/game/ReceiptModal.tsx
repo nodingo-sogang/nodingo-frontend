@@ -170,7 +170,7 @@ export default function ReceiptModal({ data, onClose }: ReceiptModalProps) {
               fontFamily: 'Pretendard, -apple-system, system-ui, sans-serif',
             }}
           >
-            📤 공유하기
+            공유하기
           </button>
         </div>
       </div>

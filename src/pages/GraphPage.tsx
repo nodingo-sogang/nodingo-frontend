@@ -17,6 +17,26 @@ import { scrapApi } from '../api/scrap';
 import type { UserGame, Badge, ReceiptData } from '../types/game';
 import type { NodeSummaryResponse, BadgeResponse } from '../types';
 
+// 오늘의 영수증 localStorage 영속 (닫아도/새로고침해도 "다시 보기" 가능)
+const RECEIPT_KEY = 'nodingo_receipt';
+function loadTodayReceipt(): ReceiptData | null {
+  try {
+    const raw = localStorage.getItem(RECEIPT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { day: string; data: ReceiptData };
+    return parsed.day === new Date().toDateString() ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+function saveTodayReceipt(data: ReceiptData) {
+  try {
+    localStorage.setItem(RECEIPT_KEY, JSON.stringify({ day: new Date().toDateString(), data }));
+  } catch {
+    /* 저장 실패 무시 */
+  }
+}
+
 // 서버 뱃지 응답 → 화면용 Badge
 function toBadge(b: BadgeResponse): Badge {
   return {
@@ -408,9 +428,12 @@ export default function GraphPage() {
   const [tab, setTab] = useState<Tab>('graph');
   const [quizFor, setQuizFor] = useState<{ keywordId: number; label: string } | null>(null);
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
+  // 오늘 발급된 영수증 (닫아도 보존 → 프로필에서 다시 보기). 새로고침 시 localStorage에서 복원.
+  const [lastReceipt, setLastReceipt] = useState<ReceiptData | null>(() => loadTodayReceipt());
   const [unlockingNodes, setUnlockingNodes] = useState<Set<string>>(new Set());
   const [reward, setReward] = useState<RewardData | null>(null);
-  const [receiptShownToday, setReceiptShownToday] = useState(false);
+  // 이미 오늘 영수증이 발급돼 있으면 자동 팝업은 안 띄움(다시 보기로만)
+  const [receiptShownToday, setReceiptShownToday] = useState(() => loadTodayReceipt() !== null);
   const [scrappedKeywords, setScrappedKeywords] = useState<ScrappedKeyword[]>([]);
 
   const prevLevelRef = useRef(userGame.level);
@@ -592,13 +615,16 @@ export default function GraphPage() {
 
     if (willCompleteGoal && !receiptShownToday) {
       setReceiptShownToday(true);
-      setReceipt({
+      const receiptData: ReceiptData = {
         date: new Date().toLocaleDateString('ko-KR'),
         username: userGame.name,
         synapseFrom: result.nodeId,
         synapseTo: '지식',
         serial: `NDG-${Date.now().toString().slice(-8)}`,
-      });
+      };
+      setReceipt(receiptData);
+      setLastReceipt(receiptData);   // 다시 보기용 보존
+      saveTodayReceipt(receiptData); // 새로고침에도 유지
     }
   }, [userGame.dailyProgress, userGame.dailyGoal, userGame.name, receiptShownToday, forceMock, syncGameFromServer]);
 
@@ -630,7 +656,13 @@ export default function GraphPage() {
     />
   );
   const rankingContent = <RankingScreen accentColor={tier.color} userGame={userGame} />;
-  const profileContent = <ProfileScreen userGame={userGame} />;
+  const profileContent = (
+    <ProfileScreen
+      userGame={userGame}
+      lastReceipt={lastReceipt}
+      onShowReceipt={() => { if (lastReceipt) setReceipt(lastReceipt); }}
+    />
+  );
 
   const overlays = (
     <>
