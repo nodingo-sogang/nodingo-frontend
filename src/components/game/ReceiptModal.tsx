@@ -39,7 +39,7 @@ export default function ReceiptModal({ data, onClose }: ReceiptModalProps) {
     try {
       // 무거운 라이브러리 → 공유 클릭 시에만 동적 로딩 (별도 청크)
       const { toBlob } = await import('html-to-image');
-      const blob = await toBlob(node, { pixelRatio: 3, cacheBust: true });
+      const blob = await toBlob(node, { pixelRatio: 3, cacheBust: true, backgroundColor: '#5BBA6F' });
       if (!blob) throw new Error('capture failed');
       const file = new File([blob], `nodingo-receipt-${data.serial}.png`, { type: 'image/png' });
 
@@ -63,9 +63,9 @@ export default function ReceiptModal({ data, onClose }: ReceiptModalProps) {
 
   return (
     <>
-      {/* ── 인스타 스토리용 공유 카드 (화면 밖, 캡처 전용) ── */}
+      {/* ── 인스타 스토리용 공유 카드 (바깥 래퍼=화면 밖 / 안쪽=캡처 대상, 위치 스타일 없음) ── */}
+      <div aria-hidden style={{ position: 'fixed', left: '-99999px', top: 0, pointerEvents: 'none' }}>
       <div ref={shareCardRef} style={{
-        position: 'fixed', left: '-99999px', top: 0,
         width: 360, boxSizing: 'border-box',
         padding: '36px 28px 30px',
         background: 'linear-gradient(165deg,#5BBA6F 0%,#3E9E7E 48%,#4FA3E0 100%)',
@@ -106,6 +106,7 @@ export default function ReceiptModal({ data, onClose }: ReceiptModalProps) {
           매일 뉴스로 나만의 지식지도를 키워요<br />
           <span style={{ opacity: 0.8 }}>#노딩고 #지식그래프</span>
         </div>
+      </div>
       </div>
 
     <div style={{
