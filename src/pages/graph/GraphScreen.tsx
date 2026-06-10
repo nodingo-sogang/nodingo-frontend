@@ -1076,9 +1076,9 @@ export default function GraphScreen({
           </svg>
         </button>
 
-        {!sheetOpen && (
+        {!sheetOpen && remaining > 0 && (
           <div style={{
-            position: 'absolute', bottom: 100, left: 0, right: 0,
+            position: 'absolute', top: 10, left: 0, right: 0,
             display: 'flex', justifyContent: 'center', pointerEvents: 'none',
           }}>
             <div style={{
