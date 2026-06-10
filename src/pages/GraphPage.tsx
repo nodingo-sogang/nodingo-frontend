@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import HUD from '../components/game/HUD';
 import QuizModal from '../components/game/QuizModal';
@@ -256,20 +256,27 @@ function ScrapScreen({
     staleTime: 60_000,
   });
 
-  // 서버에 저장된 스크랩 보관함 (영속). 실패/미로그인 시 로컬 세션 스크랩(items)로 폴백.
-  const { data: serverItems } = useQuery<ScrappedKeyword[]>({
+  // 서버에 저장된 스크랩 보관함 (영속, 4개씩 무한 스크롤). 실패/미로그인 시 로컬 세션 스크랩(items)로 폴백.
+  const {
+    data: summaryPages,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['scrapSummaries'],
-    queryFn: () =>
-      scrapApi.getScrapSummaries()
-        .then(r => (r.data.data?.content ?? []).map(s => ({
-          id: s.keyword_id,
-          label: s.word,
-          persona: s.persona,
-          summary: s.summary,
-        })))
-        .catch(() => [] as ScrappedKeyword[]),
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) => scrapApi.getScrapSummaries(pageParam).then(r => r.data.data),
+    getNextPageParam: (lastPage, allPages) => {
+      const content = lastPage?.content ?? [];
+      // Spring Slice의 last 우선, 없으면 페이지 크기(4) 미만이면 마지막으로 간주
+      if (lastPage?.last === true || content.length < 4) return undefined;
+      return allPages.length;
+    },
     enabled: !forceMock,
   });
+  const serverItems: ScrappedKeyword[] = (summaryPages?.pages ?? [])
+    .flatMap(p => p?.content ?? [])
+    .map(s => ({ id: s.keyword_id, label: s.word, persona: s.persona, summary: s.summary }));
 
   // 스크랩 그래프(노드+엣지) 신규 엔드포인트. 미배포/실패 시 null → 노드-only 폴백.
   const { data: scrapGraph } = useQuery({
@@ -309,13 +316,19 @@ function ScrapScreen({
     : { nodes: fallbackNodes, edges: [] as { source: number; target: number; weight: number }[] };
 
   return (
-    <div style={{
-      height: '100%',
-      overflowY: 'auto',
-      background: '#FAF7F1',
-      padding: '16px 16px 30px',
-      overscrollBehavior: 'contain',
-    }}>
+    <div
+      onScroll={(e) => {
+        if (view !== 'list' || !hasNextPage || isFetchingNextPage) return;
+        const el = e.currentTarget;
+        if (el.scrollHeight - el.scrollTop - el.clientHeight < 240) void fetchNextPage();
+      }}
+      style={{
+        height: '100%',
+        overflowY: 'auto',
+        background: '#FAF7F1',
+        padding: '16px 16px 30px',
+        overscrollBehavior: 'contain',
+      }}>
       <div style={{ marginBottom: 14 }}>
         <div style={{
           fontSize: 11,
@@ -435,6 +448,26 @@ function ScrapScreen({
               </div>
             </article>
           ))}
+
+          {/* 무한 스크롤: 다음 페이지 로딩 / 더 보기 폴백 */}
+          {isFetchingNextPage && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {[0, 1].map(i => <Skeleton key={i} height={92} radius={22} />)}
+            </div>
+          )}
+          {!isFetchingNextPage && hasNextPage && (
+            <button
+              onClick={() => void fetchNextPage()}
+              style={{
+                marginTop: 2, padding: '11px 0', borderRadius: 14,
+                background: '#FFFFFF', color: '#6B6B66', border: '1px solid #EFEEEA',
+                fontSize: 13, fontWeight: 800, cursor: 'pointer',
+                fontFamily: 'Pretendard, -apple-system, system-ui, sans-serif',
+              }}
+            >
+              더 보기
+            </button>
+          )}
         </div>
       ))}
 
