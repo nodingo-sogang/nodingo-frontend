@@ -468,6 +468,24 @@ export default function GraphScreen({
         return list.filter(s => s.id !== node.id);
       });
     },
+    onError: (err, { node, shouldScrap }) => {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      // 해제(unscrap)인데 404 = 서버엔 이미 스크랩 없음 → 의도(제거) 달성으로 보고 롤백 안 함
+      if (!shouldScrap && status === 404) return;
+      // 그 외 실패(예: POST 404 = 스크랩 불가 키워드) → 낙관적 ♥ 롤백 (가짜 성공 제거)
+      setScrappedNodes(prev => {
+        const next = new Map(prev);
+        if (shouldScrap) next.delete(node.id);   // 추가 실패 → 다시 제거
+        else next.set(node.id, node);            // 해제 실패 → 다시 추가
+        return next;
+      });
+      patchNodeScrapped(node.id, !shouldScrap);
+      queryClient.setQueryData<{ id: number; word: string; persona: string }[]>(['scrapNodeIds'], (old) => {
+        const list = old ?? [];
+        if (shouldScrap) return list.filter(s => s.id !== node.id);
+        return list.some(s => s.id === node.id) ? list : [...list, { id: node.id, word: node.label, persona: node.persona }];
+      });
+    },
     // 스크랩/해제 커밋 후 서버 게임 상태(스크랩 XP 등) 재동기화
     onSettled: () => onGameSync?.(),
   });
