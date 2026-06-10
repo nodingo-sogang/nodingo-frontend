@@ -1,7 +1,34 @@
 # 백엔드 API 요청서 (프론트엔드 → 백엔드)
 
-프론트엔드에서 현재 **mock 데이터로만 동작 중**이라 실제 백엔드 API가 필요한 항목 정리입니다.
+프론트엔드에서 실제 백엔드 API가 필요한 항목 정리입니다.
 화면에 실제로 쓰는 필드 기준으로 작성했고, 응답 JSON 예시는 그대로 구현하시면 프론트 연결이 바로 됩니다.
+
+---
+
+## 📊 진행 현황 (2026-06-10 기준)
+
+> ✅ 해결됨 · 🔴 미해결(작업 필요) · ❓ 백엔드 구현 여부 미확인(프론트는 연결 완료)
+
+### 🔴 지금 막혀 있는 것 (우선)
+| 항목 | 증상 | 상태 |
+|---|---|---|
+| [A-5 ①](#a-5-미해결--남은-스크랩-버그-3건) `isKeywordScrapped` 잘못된 컬럼 | **이미 스크랩한 키워드 재스크랩 시 500** | 🔴 미해결 |
+| [A-5 ②](#a-5-미해결--남은-스크랩-버그-3건) `getScrapKeywordGraph` NPE | **스크랩 그래프 엣지가 안 뜸** | 🟡 백엔드 수정 적용 중 |
+| [A-5 ③](#a-5-미해결--남은-스크랩-버그-3건) `deleteByUserId` 복붙 버그 | **회원탈퇴가 깨질 수 있음** | 🔴 미해결 |
+
+### ✅ 해결된 것
+| 항목 | 내용 | 상태 |
+|---|---|---|
+| [A-4](#a-4-해결됨-일반-키워드-스크랩-저장조회-커밋-1896b24) 일반 키워드 스크랩 저장/조회 | `nodes`·`summaries`가 일반 스크랩 누락/NPE | ✅ 커밋 `1896b24` |
+| [5번](#5--스크랩-그래프-엣지-포함--배포됨) 스크랩 그래프 엔드포인트 | `/api/users/scraps/keywords/graph` 생성 | ✅ 배포됨(단, 엣지는 A-5②로 막힘) |
+| [D-1](#d-1--oauth-성공-후-리다이렉트-주소-변경-유일한-필수-변경) OAuth 리다이렉트 | 배포본 로그인 | ✅ (배포 로그인 정상) |
+
+### ❓ 확인 필요 (프론트는 연결돼 있음 — 백엔드 구현/검증만 확인)
+| 항목 | 내용 |
+|---|---|
+| [A-1](#a-1--퀴즈-채점-인덱스-불일치-정답-맞혀도-오답-처리) 퀴즈 채점 인덱스 | XP 적립 정상화 여부 |
+| [A-2](#a-2--퀴즈-목록에-풀이-여부solved-플래그) 퀴즈 `solved` 플래그 / [A-3](#a-3--재온보딩-시-추천-재생성-안-됨) 재온보딩 추천 재생성 | 적용 여부 |
+| [1-1](#1-1-랭킹리더보드-조회) 랭킹 · [1-2](#1-2-내-뱃지-목록-조회) 뱃지 · [2-1](#2-1-get-apiusersgame-응답에-필드-추가) game 확장 · [4](#4--친구-초대-코드-방식--신규-요청) 친구 | 구현/검증 여부 |
 
 ---
 
@@ -53,25 +80,67 @@ if (recommendKeywordRepository.existsByUserIdAndTargetDate(user.getId(), today))
 - 요청: `saveOnboardingInfo`가 오늘 관심사를 지우고 다시 넣듯, **재온보딩 시 오늘 RecommendKeyword도 삭제 후 재생성**(또는 테스트용 리셋 엔드포인트)
 - → 한 계정으로 페르소나 바꿔가며 추천 변화를 테스트할 수 있게 됨
 
-### A-4. 🔴 일부 그래프 노드 스크랩 시 `POST /api/keywords/{id}/scrap` → 404 (키워드 없음)
+### A-4. ✅ [해결됨] 일반 키워드 스크랩 저장/조회 (커밋 `1896b24`)
 
-**증상:** 그래프에서 어떤 노드는 스크랩이 되는데(예: id 834 "화제성" → `201 Created`), **어떤 노드는 `404 Not Found`** 가 납니다 (예: id 1232 "한·미 금리차 역전").
-- 화면엔 ♥가 켜지지만 서버엔 저장 안 됨 → 새로고침하면 사라지고, 보관함도 비어 보임.
-- (프론트는 실패 시 ♥를 롤백하도록 보강했지만, **근본 원인은 그 노드를 스크랩할 수 없는 것**)
+> **상태: 해결.** 일반 그래프 노드(추천키워드 아닌 키워드)를 스크랩하면 `POST`는 201인데 `nodes`/`summaries` 목록에 안 떠서 새로고침 시 사라지던 문제. 근본 원인은 **저장은 `createPureKeywordScrap`(recommendKeyword=null)으로 되는데, 읽는 쪽이 `recommendKeyword`가 항상 있다고 가정**한 것.
 
-**원인 추정:** `GET /api/graphs/nodes`가 반환하는 **노드 id**가, `POST /api/keywords/{keywordId}/scrap`가 기대하는 **스크랩 가능한 Keyword 레코드 id와 불일치**. 즉 그래프엔 보이는데 **스크랩 대상 키워드로는 존재하지 않는 노드**가 있습니다. (이웃/파생 노드가 Keyword 엔티티로 저장돼 있지 않거나, id 체계가 다를 가능성)
+**커밋 `1896b24`에서 수정 확인된 항목:**
+- ✅ `UserScrapRepositoryImpl.findKeywordScrapsByUserId` — `recommendKeyword.isNotNull()` 필터 제거, `keyword` 조인으로 변경 → 일반 스크랩도 `nodes`/`summaries`에 포함.
+- ✅ `ScrapKeywordNodeResult.from` — `scrap.getKeyword()` 직접 사용(NPE 제거).
+- ✅ `getScrapKeywordSummaries` — `recommendKeyword` null 분기 추가(일반 스크랩은 안내 문구 요약 + `news=null`).
 
-```text
-요청:  POST /api/keywords/1232/scrap
-응답:  404 Not Found  { "success": false, "code": 404, "message": "...키워드를 찾을 수 없습니다." }
-정상:  POST /api/keywords/834/scrap  → 201 Created
+→ 일반 키워드 스크랩이 보관함 리스트/요약에 정상 반영됩니다. **프론트 수정 불필요.**
+→ 단, **같은 뿌리의 나머지 3건은 아직 미해결**(아래 A-5). 특히 그래프 엣지(A-5②)는 이번 커밋에서 빠졌습니다.
+
+---
+
+### A-5. 🔴 [미해결] 남은 스크랩 버그 3건
+
+A-4 수정(커밋 `1896b24`) **이후 재테스트**. `nodes`/`summaries`는 고쳐졌으나 아래 3건이 남아 있습니다. **전부 백엔드, 프론트 수정 불필요.**
+
+#### ① 🔴 이미 스크랩된 키워드 재스크랩 시 500 (중복체크가 잘못된 컬럼 비교)
+- **증상:** 이미 스크랩된 키워드(예: 834)를 다시 `POST /api/keywords/834/scrap` → **500 Internal Server Error**.
+- **원인:** `addScrap`이 `isKeywordScrapped(userId, keywordId)`로 중복 검사하는데, 내부 쿼리가 `keyword.id`가 아니라 **`recommendKeyword.id`를 비교**(`UserScrapRepositoryImpl` L27). recommendKeyword PK는 keywordId와 안 맞아 **중복을 못 거름** → `save()` 진행 → `user_scraps`의 유니크 제약 `(user_id, keyword_id)` 위반 → `DataIntegrityViolationException` → 전용 핸들러 없어 generic 500.
+  - 참고: `DuplicateScrapException`은 409로 매핑돼 있음(`GlobalExceptionHandler` L100-102). 중복만 제대로 검출됐으면 깔끔한 409였을 것.
+```java
+// UserScrapRepositoryImpl.isKeywordScrapped (L21~32)
+// AS-IS
+userScrap.recommendKeyword.id.eq(recommendKeywordId)
+// TO-BE — 실제 스크랩 키 비교
+userScrap.keyword.id.eq(keywordId)
 ```
+- `findKeywordScrap`(L35-44, removeScrap가 사용)도 동일하게 `recommendKeyword.id`를 봐서 같이 `keyword.id`로 교정 권장.
 
-**요청 사항**
-- **그래프가 내려주는 모든 노드 id가 `POST /api/keywords/{id}/scrap` 로 스크랩 가능**하도록 정합성 보장
-  - 그래프 노드 ↔ 스크랩 키워드의 **id 체계 일치** 확인
-  - 또는 스크랩 시 노드 id로 **키워드를 찾지 못하면 생성/매핑**하거나, 그래프 응답에 **scrap 가능 여부/스크랩용 keywordId**를 따로 내려주기
-- ✅ 프론트는 노드 id를 그대로 전송 중 — 백엔드에서 그 id를 스크랩 키워드로 해석할 수 있으면 즉시 해결
+#### ② 🟡 스크랩 그래프 엣지가 안 뜸 (graph 엔드포인트 NPE → 500) — **백엔드 수정 적용 중**
+> **상태(2026-06-10): 최성민님 수정 적용 중.** 일반 키워드는 추천 점수(`recommendKeyword.score`)가 없어 `double score = (rk != null) ? rk.getScore() : 0.0;`로 폴백 처리. (4월 설계 대비 DB가 많이 바뀌어 스키마 전면 수정은 보류, 현재로선 이 방식이 최선) → 배포되면 엣지 정상 표시.
+> **프론트는 그대로 OK** — `ScrapGraphView`는 `score`를 안 쓰므로 `score=0`이 와도 무해. 추가 작업 없음.
+
+- **증상:** 보관함 그래프 뷰에 노드만 뜨고 **엣지(관계선)가 안 보임**.
+- **원인:** `getScrapKeywordGraph`(`RecommendKeywordScrapQueryService` L66-80)가 `s.getRecommendKeyword().getKeyword()`를 호출 → 일반 스크랩(recommendKeyword=null)이 하나라도 있으면 **NPE → 500** → 프론트가 catch해서 노드-only로 폴백 → 엣지 없음. (A-4 ③과 동일 버그인데 직전 커밋에서 summaries만 고치고 graph는 빠뜨림.)
+```java
+// AS-IS (L66-68, L70-80)
+.map(s -> s.getRecommendKeyword().getKeyword().getId())
+... var rk = s.getRecommendKeyword(); var k = rk.getKeyword();
+new NodeResult(k.getId(), k.getWord(), k.getPersona().name(), rk.getScore());
+// TO-BE — keyword 직접 사용, score는 recommendKeyword 없으면 기본값
+.map(s -> s.getKeyword().getId())
+... var k = s.getKeyword();
+double score = s.getRecommendKeyword() != null ? s.getRecommendKeyword().getScore() : 0.0;
+new NodeResult(k.getId(), k.getWord(), k.getPersona().name(), score);
+```
+- ✅ 프론트는 엣지 렌더(`ScrapGraphView` `<line>`)까지 준비 완료 — 백엔드가 500만 안 던지면 즉시 엣지 표시.
+- 참고: 고친 뒤에도 엣지는 **스크랩한 키워드 2개가 서로 직접 `keyword_relation`이 있을 때만** 그려짐(`findAllRelationsIn`은 양 끝점이 모두 스크랩 집합일 때만 반환). 스크랩이 적거나 서로 관계 없으면 0개가 정상.
+
+#### ③ 🔴 회원탈퇴가 스크랩을 안 지움 → 탈퇴 FK 위반으로 실패 가능 (복붙 버그)
+- **증상:** 스크랩이 있는 계정 탈퇴 시 외래키 제약 위반으로 탈퇴가 실패(500)할 수 있음.
+- **원인:** `AuthCommandService.deleteAllUserData` L150이 `userScrapRepository.deleteByUserId(userId)`를 호출하는데, 그 쿼리(`UserScrapRepository` L18)가 **`delete from UserScrap`이 아니라 `delete from UserQuizResult`**로 잘못 작성됨(복붙) → 스크랩 row가 안 지워진 채 L159 `userRepository.delete(user)` → `user_scraps`가 user_id를 참조 → FK 위반.
+```java
+// UserScrapRepository.deleteByUserId (L17-19)
+// AS-IS
+@Query("delete from UserQuizResult u where u.user.id = :userId")
+// TO-BE
+@Query("delete from UserScrap u where u.user.id = :userId")
+```
 
 ---
 
@@ -81,7 +150,9 @@ if (recommendKeywordRepository.existsByUserIdAndTargetDate(user.getId(), today))
 - **API 호출(CORS):** 프론트 `vercel.json`에서 `/api/*`를 백엔드로 **서버사이드 프록시**합니다. → 브라우저 기준 same-origin이라 **CORS 변경 불필요.** (백엔드 직접 호출이 없음)
 - **OAuth 콜백(네이버):** 네이버 등록 콜백은 백엔드 도메인(`{backend}/login/oauth2/code/naver`) 그대로라 **네이버 콘솔 변경 불필요.**
 
-### D-1. 🔴 OAuth 성공 후 리다이렉트 주소 변경 (유일한 필수 변경)
+### D-1. ✅ [해결됨] OAuth 성공 후 리다이렉트 주소 변경
+> **상태: 해결.** 배포본(Vercel)에서 네이버 로그인 정상 동작 확인. (아래는 당시 요청 내용 — 참고용 보존)
+
 현재 `app.oauth2.redirect-uri`가 백엔드 자기 페이지(`/auth/callback.html`)를 가리켜서, 배포된 프론트로 토큰이 안 돌아옵니다. `OAuth2SuccessHandler`가 `redirect-uri?accessToken=..&refreshToken=..`로 보내므로, **이 값만 배포 프론트의 콜백 라우트로** 바꾸면 됩니다:
 
 ```yaml
@@ -266,7 +337,10 @@ app:
 
 ---
 
-## 5. 🆕 스크랩 그래프 (엣지 포함) — 신규 요청
+## 5. ✅ 스크랩 그래프 (엣지 포함) — 배포됨
+
+> **상태: 엔드포인트 배포 완료.** `GET /api/users/scraps/keywords/graph`가 생성됐고 응답 스키마(`nodes{id,word,persona,score}` + `edges{source,target,weight}`)도 프론트 매핑과 일치합니다. 프론트는 `ScrapGraphView`로 노드+엣지 렌더 준비 완료.
+> **단, 현재 엣지가 안 뜹니다 → 원인은 [A-5 ②](#a-5-미해결--남은-스크랩-버그-3건)(graph 엔드포인트 NPE 500).** 그것만 고치면 즉시 엣지 표시됩니다. (아래는 원래 요청 명세 — 참고용 보존)
 
 **화면:** 스크랩 보관함에 **리스트 ↔ 그래프 뷰 토글**을 추가합니다. 그래프 뷰는 내가 스크랩한 키워드들을 **노드 + 관계선(엣지)** 으로 보여줍니다.
 
