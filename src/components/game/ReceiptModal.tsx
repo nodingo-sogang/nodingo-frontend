@@ -81,7 +81,17 @@ export default function ReceiptModal({ data, onClose }: ReceiptModalProps) {
         {/* 상단: 브랜드 + 헤드라인 */}
         <div style={{ position: 'relative' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, fontWeight: 900, fontSize: 19, letterSpacing: '-0.02em' }}>
-            <span style={{ width: 24, height: 24, borderRadius: 8, background: '#FFFFFF', display: 'inline-block', boxShadow: '0 0 0 5px rgba(255,255,255,0.18)' }} />
+            <svg width="27" height="27" viewBox="0 0 22 22" fill="none" style={{ flexShrink: 0 }}>
+              <circle cx="11" cy="11" r="4" fill="#FFFFFF" />
+              <circle cx="4" cy="5" r="2.5" fill="#FFFFFF" opacity="0.85" />
+              <circle cx="18" cy="5" r="2.5" fill="#FFFFFF" opacity="0.85" />
+              <circle cx="4" cy="17" r="2.5" fill="#FFFFFF" opacity="0.85" />
+              <circle cx="18" cy="17" r="2.5" fill="#FFFFFF" opacity="0.85" />
+              <line x1="11" y1="11" x2="4" y2="5" stroke="#FFFFFF" strokeWidth="1.5" opacity="0.55" />
+              <line x1="11" y1="11" x2="18" y2="5" stroke="#FFFFFF" strokeWidth="1.5" opacity="0.55" />
+              <line x1="11" y1="11" x2="4" y2="17" stroke="#FFFFFF" strokeWidth="1.5" opacity="0.55" />
+              <line x1="11" y1="11" x2="18" y2="17" stroke="#FFFFFF" strokeWidth="1.5" opacity="0.55" />
+            </svg>
             Nodingo
           </div>
           <div style={{ marginTop: 28, fontSize: 12, fontWeight: 800, letterSpacing: '.16em', opacity: 0.9 }}>
