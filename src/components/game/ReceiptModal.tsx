@@ -14,6 +14,7 @@ const SERRATED = `M0,0 Q10,14 20,0 Q30,14 40,0 Q50,14 60,0 Q70,14 80,0 Q90,14 10
 
 export default function ReceiptModal({ data, onClose }: ReceiptModalProps) {
   const receiptRef = useRef<HTMLDivElement>(null);
+  const shareCardRef = useRef<HTMLDivElement>(null);
 
   // 텍스트 폴백 (이미지 캡처 실패 시)
   const shareText =
@@ -33,12 +34,12 @@ export default function ReceiptModal({ data, onClose }: ReceiptModalProps) {
   // 영수증을 PNG 이미지로 떠서 공유 → 인스타 등에 실제 이미지로 전송.
   // 모바일: navigator.share(files) / 데스크톱·미지원: PNG 다운로드 / 실패: 텍스트 폴백
   const handleShare = async () => {
-    const node = receiptRef.current;
+    const node = shareCardRef.current ?? receiptRef.current;
     if (!node) { void shareTextFallback(); return; }
     try {
       // 무거운 라이브러리 → 공유 클릭 시에만 동적 로딩 (별도 청크)
       const { toBlob } = await import('html-to-image');
-      const blob = await toBlob(node, { pixelRatio: 2, backgroundColor: '#ffffff', cacheBust: true });
+      const blob = await toBlob(node, { pixelRatio: 3, cacheBust: true });
       if (!blob) throw new Error('capture failed');
       const file = new File([blob], `nodingo-receipt-${data.serial}.png`, { type: 'image/png' });
 
@@ -61,6 +62,52 @@ export default function ReceiptModal({ data, onClose }: ReceiptModalProps) {
   };
 
   return (
+    <>
+      {/* ── 인스타 스토리용 공유 카드 (화면 밖, 캡처 전용) ── */}
+      <div ref={shareCardRef} style={{
+        position: 'fixed', left: '-99999px', top: 0,
+        width: 360, boxSizing: 'border-box',
+        padding: '36px 28px 30px',
+        background: 'linear-gradient(165deg,#5BBA6F 0%,#3E9E7E 48%,#4FA3E0 100%)',
+        fontFamily: '"Pretendard", -apple-system, system-ui, sans-serif',
+        color: '#FFFFFF',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 900, fontSize: 18, letterSpacing: '-0.02em' }}>
+          <span style={{ width: 22, height: 22, borderRadius: 7, background: '#FFFFFF', display: 'inline-block', boxShadow: '0 0 0 5px rgba(255,255,255,0.18)' }} />
+          Nodingo
+        </div>
+        <div style={{ marginTop: 22, fontSize: 12, fontWeight: 800, letterSpacing: '.14em', opacity: 0.92 }}>
+          오늘의 지식 영수증
+        </div>
+        <div style={{ marginTop: 6, fontSize: 27, fontWeight: 900, lineHeight: 1.28, letterSpacing: '-0.03em' }}>
+          {data.username} 님,<br />오늘도 지식 한 입 🧠
+        </div>
+        <div style={{ marginTop: 22, background: '#FFFFFF', color: '#0F1115', borderRadius: 22, padding: '18px 20px 16px', boxShadow: '0 10px 30px rgba(15,17,21,0.18)' }}>
+          {[
+            ['오늘의 지식 칼로리', '+50 XP'],
+            ['새로 연결된 시냅스', `${data.synapseFrom} → ${data.synapseTo}`],
+            ['일일 목표', 'CLEAR ✓'],
+            ['발급일', data.date],
+          ].map(([k, v], i, arr) => (
+            <div key={k} style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '7px 0', fontSize: 13.5,
+              borderBottom: i < arr.length - 1 ? '1px dashed #ECECE8' : 'none',
+            }}>
+              <span style={{ color: '#6B6B66', fontWeight: 700 }}>{k}</span>
+              <span style={{ fontWeight: 900 }}>{v}</span>
+            </div>
+          ))}
+          <div style={{ marginTop: 12, textAlign: 'center', fontFamily: '"Courier New", monospace', fontSize: 10, letterSpacing: 4, color: '#9A9A94' }}>
+            {data.serial}
+          </div>
+        </div>
+        <div style={{ marginTop: 20, textAlign: 'center', fontSize: 11.5, fontWeight: 700, opacity: 0.92, lineHeight: 1.6 }}>
+          매일 뉴스로 나만의 지식지도를 키워요<br />
+          <span style={{ opacity: 0.8 }}>#노딩고 #지식그래프</span>
+        </div>
+      </div>
+
     <div style={{
       position: 'absolute', inset: 0, zIndex: 200,
       background: 'rgba(15,17,21,0.5)',
@@ -175,5 +222,6 @@ export default function ReceiptModal({ data, onClose }: ReceiptModalProps) {
         </div>
       </div>
     </div>
+    </>
   );
 }
