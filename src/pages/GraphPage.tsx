@@ -381,113 +381,60 @@ function ScrapScreen({
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {list.map(item => {
-            const summary = MOCK_SUMMARIES[item.id];
-            const news = fallbackNews(summary, item);
-            return (
-              <article key={item.id} style={{
+          {list.map(item => (
+            <article
+              key={item.id}
+              onClick={() => setSelected(item)}
+              style={{
                 background: '#FFFFFF',
                 borderRadius: 22,
                 padding: 14,
                 boxShadow: '0 2px 8px rgba(15,17,21,0.04)',
-              }}>
-                <button
-                  onClick={() => onOpen(item)}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    border: 'none',
-                    background: 'transparent',
-                    padding: 0,
-                    cursor: 'pointer',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{
-                      width: 9,
-                      height: 9,
-                      borderRadius: 999,
-                      background: '#E8657A',
-                      boxShadow: '0 0 8px #E8657A66',
-                    }} />
-                    <span style={{ fontSize: 17, fontWeight: 900, color: '#0F1115' }}>{item.label}</span>
-                    <span style={{
-                      marginLeft: 'auto',
-                      padding: '3px 8px',
-                      borderRadius: 999,
-                      background: '#F4F4F0',
-                      color: '#6B6B66',
-                      fontSize: 10.5,
-                      fontWeight: 800,
-                    }}>
-                      {item.persona}
-                    </span>
-                  </div>
-                  <p style={{
-                    marginTop: 8,
-                    fontSize: 12.5,
-                    lineHeight: 1.55,
-                    color: '#4A4C50',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                  }}>
-                    {item.summary.replace(/\*\*/g, '')}
-                  </p>
-                </button>
-
-                <div style={{
-                  marginTop: 12,
-                  paddingTop: 12,
-                  borderTop: '1px dashed #ECECE8',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 7,
+                cursor: 'pointer',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{
+                  width: 9,
+                  height: 9,
+                  borderRadius: 999,
+                  background: '#E8657A',
+                  boxShadow: '0 0 8px #E8657A66',
+                }} />
+                <span style={{ fontSize: 17, fontWeight: 900, color: '#0F1115' }}>{item.label}</span>
+                <span style={{
+                  marginLeft: 'auto',
+                  padding: '3px 8px',
+                  borderRadius: 999,
+                  background: '#F4F4F0',
+                  color: '#6B6B66',
+                  fontSize: 10.5,
+                  fontWeight: 800,
                 }}>
-                  {news.slice(0, 3).map(article => (
-                    <a
-                      key={article.id}
-                      href={article.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{
-                        display: 'block',
-                        padding: '10px 11px',
-                        borderRadius: 14,
-                        background: '#FAF7F1',
-                        border: '1px solid #EFEEEA',
-                        textDecoration: 'none',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                        {article.outlet && (
-                          <span style={{
-                            padding: '2px 7px',
-                            borderRadius: 999,
-                            background: '#0F1115',
-                            color: '#FFFFFF',
-                            fontSize: 9.5,
-                            fontWeight: 800,
-                          }}>
-                            {article.outlet}
-                          </span>
-                        )}
-                        {article.date && (
-                          <span style={{ fontSize: 10.5, color: '#6B6B66', fontWeight: 700 }}>
-                            {article.date}
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0F1115', lineHeight: 1.35 }}>
-                        {article.title}
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              </article>
-            );
-          })}
+                  {item.persona}
+                </span>
+              </div>
+              <p style={{
+                marginTop: 8,
+                fontSize: 12.5,
+                lineHeight: 1.55,
+                color: '#4A4C50',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}>
+                {item.summary.replace(/\*\*/g, '')}
+              </p>
+              <div style={{
+                marginTop: 10,
+                display: 'flex', alignItems: 'center', gap: 4,
+                fontSize: 11.5, fontWeight: 700, color: '#9A9A94',
+              }}>
+                관련 뉴스 원문 보기 ›
+              </div>
+            </article>
+          ))}
         </div>
       ))}
 
